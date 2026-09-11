@@ -68,7 +68,7 @@ class LoginPage:
         )
 
         self.logo = ft.Image(
-            src="/icons/loading-animation.png",
+            src="/images/logo-mark.svg",
             width=80,
             height=80,
             fit=ft.BoxFit.CONTAIN,
@@ -82,7 +82,7 @@ class LoginPage:
                     margin=ft.Margin.only(bottom=10),
                 ),
                 ft.Text(
-                    "StreamCap",
+                    "录播达人",
                     size=28,
                     weight=ft.FontWeight.BOLD,
                     color="#0078d4",
@@ -163,7 +163,7 @@ class LoginPage:
             logger.info(f"Login successful: {username}")
             await self.page.shared_preferences.set("session_token", token)
             await self.on_login_success(token)
-            self.page.title = "StreamCap"
+            self.page.title = "录播达人"
         else:
             self.show_error(self._["login_failed"])
 

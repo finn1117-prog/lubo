@@ -174,6 +174,7 @@ cython_debug/
 .idea/
 
 backup_config/
+design-system/
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe

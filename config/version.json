@@ -1,7 +1,7 @@
 {
   "introduction": {
-    "en": "A free application dedicated to recording videos from online live streaming platforms. By integrating FFmpeg, it efficiently and reliably records live streams from over 40 major platforms including Douyin, TikTok, Kuaishou, Huya, Douyu, Bilibili, Rednote, Baidu, Weibo, Kuwo, Migu, Twitch, YouTube, PandaTV, SoopLive, FlexTV(TTing), PopKontv, Twitcasting, WinkTV, 17Live, Acfun, CHZZK, and Shopee.",
-    "zh_CN": "一款专注于录制在线直播平台视频的免费应用。通过集成FFmpeg，高效、稳定地录制抖音、TikTok、快手、虎牙、斗鱼、B站、小红书、百度、微博、酷狗、咪咕、Twitch、YouTube、PandaTV、SoopLive、FlexTV(TTing)、PopKontv、Twitcasting、WinkTV、17Live、Acfun、CHZZK 和 Shopee 等40+主流平台的直播流。"
+    "en": "LuboDaren is a local-first live stream recording application based on StreamCap. Recordings stay on the user's computer and platform credentials are never sent to the license service.",
+    "zh_CN": "录播达人是一款基于 StreamCap 二次开发的本地优先直播录制软件。录像只保存在用户电脑中，平台登录凭据不会发送到授权服务器。"
   },
   "open_source_license": "Apache License 2.0",
   "version_updates": [
@@ -22,7 +22,7 @@
       "announcement": {
         "en": [
           {
-            "title": "StreamCap v1.0.3 is officially released",
+            "title": "LuboDaren V1 is in development",
             "content": "Fix some live streams cannot be recorded, adapt to updated UI version, and improve stability"
           },
           {
@@ -36,7 +36,7 @@
         ],
         "zh_CN": [
           {
-            "title": "StreamCap v1.0.3 正式发布",
+            "title": "录播达人 V1 开发版",
             "content": "修复部分直播无法录制的问题，适配更新UI版本，提升稳定性"
           },
           {

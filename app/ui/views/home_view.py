@@ -42,7 +42,7 @@ class HomePage(PageBase):
         self.content_area.update()
 
     def create_home_header(self):
-        logo_path = os.path.join("icons", "loading-animation.png")
+        logo_path = os.path.join("images", "logo-mark.svg")
 
         logo = ft.Image(
             src=logo_path,

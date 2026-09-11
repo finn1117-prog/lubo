@@ -5,7 +5,10 @@ import time
 import flet as ft
 
 from . import execute_dir, resource_dir
+from .commercial.bootstrap import create_commercial_runtime
+from .commercial.license import LicenseDecision, LicenseState
 from .core.runtime.backend_services import BackendServices
+from .core.runtime.paths import user_data_dir
 from .core.runtime.scheduled_shutdown import ScheduledShutdownManager
 from .core.update.update_checker import UpdateChecker
 from .initialization.installation_manager import InstallationManager
@@ -13,7 +16,9 @@ from .ui.components.business.recording_card import RecordingCardManager
 from .ui.components.common.show_snackbar import ShowSnackBar
 from .ui.navigation.sidebar import LeftNavigationMenu, NavigationSidebar
 from .ui.views.about_view import AboutPage
+from .ui.views.activation_view import ActivationPage
 from .ui.views.home_view import HomePage
+from .ui.views.platform_login_view import PlatformLoginPage
 from .ui.views.recordings_view import RecordingsPage
 from .ui.views.settings_view import SettingsPage
 from .ui.views.storage_view import StoragePage
@@ -51,14 +56,42 @@ class App:
 
         self.settings = SettingsPage(self)
         services.settings_config.adopt_user_config(self.settings.user_config)
-        services.settings_config.adopt_cookies_config(self.settings.cookies_config)
+        legacy_kuaishou_cookie = self.settings.cookies_config.pop("kuaishou", "")
+        runtime_cookies = dict(self.settings.cookies_config)
+        services.settings_config.adopt_cookies_config(runtime_cookies)
         services.settings_config.adopt_accounts_config(self.settings.accounts_config)
         services.settings_config.language_code = self.settings.language_code or services.settings_config.language_code
         self.language_code = self.settings.language_code
+        self.commercial_required = os.getenv("LICENSE_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+        self.commercial_runtime = create_commercial_runtime(
+            user_data_dir,
+            self._set_runtime_cookie,
+            legacy_kuaishou_cookie,
+        )
+        if legacy_kuaishou_cookie and self.commercial_runtime.login_service:
+            self.page.run_task(self.config_manager.save_cookies_config, self.settings.cookies_config)
+        self.license_service = self.commercial_runtime.license_service
+        if not self.commercial_required:
+            self.license_decision = LicenseDecision(True, LicenseState.ACTIVE, "开发模式已跳过授权")
+        elif self.license_service:
+            try:
+                self.license_decision = self.license_service.local_status()
+            except Exception:
+                self.license_decision = LicenseDecision(False, LicenseState.INVALID, "本地许可证无法读取")
+        else:
+            self.license_decision = LicenseDecision(
+                False,
+                LicenseState.MISSING,
+                self.commercial_runtime.configuration_error or "授权服务不可用",
+            )
+        self.recording_enabled = self.license_decision.allowed
+        self._license_watch_started = False
         self.about = AboutPage(self)
         self.recordings = RecordingsPage(self)
         self.home = HomePage(self)
         self.storage = StoragePage(self)
+        self.activation = ActivationPage(self)
+        self.platform_login = PlatformLoginPage(self, self.commercial_runtime.login_service)
         self.pages = self.initialize_pages()
         self.sidebar = NavigationSidebar(self)
         self.left_navigation_menu = LeftNavigationMenu(self)
@@ -156,6 +189,8 @@ class App:
 
     def initialize_pages(self):
         return {
+            "activation": self.activation,
+            "platform_login": self.platform_login,
             "settings": self.settings,
             "home": self.home,
             "recordings": self.recordings,
@@ -169,6 +204,8 @@ class App:
         self._loading_page = True
 
         try:
+            if self.commercial_required and not self.license_decision.allowed and page_name != "activation":
+                page_name = "activation"
             await self.clear_content_area()
             if page := self.pages.get(page_name):
                 await self.settings.is_changed()
@@ -220,8 +257,59 @@ class App:
             logger.error(f"Update check failed: {e}")
 
     async def start_periodic_tasks(self):
+        decision = await self.check_license()
+        await self.apply_license_decision(decision)
+        if not decision.allowed:
+            return
         rm = self.record_manager
         if rm is None:
             return
         interval = int(rm.loop_time_seconds or 180)
         await rm.setup_periodic_live_check(interval)
+
+    def _set_runtime_cookie(self, platform_key: str, cookie_header: str | None) -> None:
+        if cookie_header:
+            self.services.settings_config.cookies_config[platform_key] = cookie_header
+        else:
+            self.services.settings_config.cookies_config.pop(platform_key, None)
+
+    async def check_license(self) -> LicenseDecision:
+        if not self.commercial_required:
+            return LicenseDecision(True, LicenseState.ACTIVE, "开发模式已跳过授权")
+        if not self.license_service:
+            return LicenseDecision(
+                False,
+                LicenseState.MISSING,
+                self.commercial_runtime.configuration_error or "授权服务不可用",
+            )
+        try:
+            return await self.license_service.check_access(online=True)
+        except Exception:
+            try:
+                return self.license_service.local_status()
+            except Exception:
+                return LicenseDecision(False, LicenseState.INVALID, "许可证校验失败")
+
+    async def apply_license_decision(self, decision: LicenseDecision, *, navigate: bool = False) -> None:
+        self.license_decision = decision
+        self.recording_enabled = decision.allowed
+        if self.current_page is self.activation:
+            await self.activation.show_decision(decision)
+        if navigate and decision.allowed:
+            if self.commercial_runtime.login_service:
+                await self.commercial_runtime.login_service.restore()
+            if self.page.web:
+                self.services.start_background_loop()
+            elif self.record_manager is not None and not self.record_manager.is_periodic_task_running():
+                self.page.run_task(self.start_periodic_tasks)
+        if navigate:
+            await self.page.push_route("/home" if decision.allowed else "/activation")
+
+    async def start_license_watch(self) -> None:
+        if self._license_watch_started or not self.commercial_required:
+            return
+        self._license_watch_started = True
+        interval = max(300, int(os.getenv("LICENSE_CHECK_INTERVAL_SECONDS", "21600")))
+        while True:
+            await asyncio.sleep(interval)
+            await self.apply_license_decision(await self.check_license())

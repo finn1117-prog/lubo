@@ -2,6 +2,8 @@
   "sidebar": {
     "home": "Home",
     "recordings": "Recordings",
+    "activation": "License",
+    "platform_login": "Platform login",
     "settings": "Settings",
     "storage": "Storage",
     "about": "About",
@@ -13,7 +15,7 @@
     "colors": "Color List"
   },
     "home_page": {
-      "welcome": "Welcome to StreamCap",
+      "welcome": "Welcome to LuboDaren",
       "tagline": "Record every exciting moment of the live broadcast",
       "start_recording": "Start Recording",
       "recording_list": "Recording List",
@@ -223,7 +225,7 @@
     "scheduled_shutdown_pick_time": "Select daily shutdown time",
     "scheduled_shutdown_more": "Open shutdown settings",
     "scheduled_shutdown_tip": "Start the shutdown countdown at the selected time every day",
-    "scheduled_shutdown_system_message": "StreamCap scheduled shutdown started; it can be cancelled within 60 seconds",
+    "scheduled_shutdown_system_message": "LuboDaren scheduled shutdown started; it can be cancelled within 60 seconds",
     "scheduled_shutdown_countdown": "The system will shut down in {seconds} seconds.",
     "scheduled_shutdown_cancel": "Cancel this shutdown",
     "scheduled_shutdown_cancelled": "This shutdown has been cancelled",
@@ -243,7 +245,7 @@
     "quick_shutdown_cancelled": "Quick shutdown cancelled",
     "quick_shutdown_failed": "Unable to schedule quick shutdown: {error}",
     "quick_shutdown_cancel_failed": "Unable to cancel quick shutdown: {error}",
-    "quick_shutdown_system_message": "StreamCap quick shutdown: {hours}-hour countdown",
+    "quick_shutdown_system_message": "LuboDaren quick shutdown: {hours}-hour countdown",
     "is_proxy_enabled": "Configuration for using proxy and related settings",
     "enable_proxy": "Enable Proxy",
     "proxy_address": "Proxy Address",
@@ -526,7 +528,7 @@
     "exit": "Exit Program"
   },
   "login_page": {
-    "login_title": "StreamCap Login",
+    "login_title": "LuboDaren Login",
     "login_subtitle": "Please login to your account",
     "username": "Username",
     "password": "Password",

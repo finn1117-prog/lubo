@@ -107,7 +107,7 @@ class LeftNavigationMenu(ft.Column):
             content=ft.Row(
                 controls=[
                     ft.Image(src="images/logo-mark.svg", width=38, height=38, fit=ft.BoxFit.CONTAIN),
-                    ft.Text("StreamCap", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Text("录播达人", size=18, weight=ft.FontWeight.BOLD),
                 ],
                 spacing=10,
                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -203,19 +203,33 @@ class NavigationSidebar:
                 selected_icon=ft.Icons.DASHBOARD_ROUNDED,
             ),
             ControlGroup(
+                icon=ft.Icons.VERIFIED_USER_OUTLINED,
+                label=self._["activation"],
+                index=2,
+                name="activation",
+                selected_icon=ft.Icons.VERIFIED_USER,
+            ),
+            ControlGroup(
+                icon=ft.Icons.ACCOUNT_CIRCLE_OUTLINED,
+                label=self._["platform_login"],
+                index=3,
+                name="platform_login",
+                selected_icon=ft.Icons.ACCOUNT_CIRCLE,
+            ),
+            ControlGroup(
                 icon=ft.Icons.SETTINGS,
                 label=self._["settings"],
-                index=2,
+                index=4,
                 name="settings",
                 selected_icon=ft.Icons.SETTINGS,
             ),
             ControlGroup(
                 icon=ft.Icons.DRIVE_FILE_MOVE,
                 label=self._["storage"],
-                index=3,
+                index=5,
                 name="storage",
                 selected_icon=ft.Icons.DRIVE_FILE_MOVE_OUTLINE,
             ),
-            ControlGroup(icon=ft.Icons.INFO, label=self._["about"], index=4, name="about", selected_icon=ft.Icons.INFO),
+            ControlGroup(icon=ft.Icons.INFO, label=self._["about"], index=6, name="about", selected_icon=ft.Icons.INFO),
         ]
         self.selected_control_group = self.control_groups[0]

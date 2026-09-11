@@ -76,6 +76,9 @@ def get_route_handler() -> dict[str, str]:
         "/": "home",
         "/home": "home",
         "/recordings": "recordings",
+        "/activation": "activation",
+        "/platform-login": "platform_login",
+        "/platform_login": "platform_login",
         "/settings": "settings",
         "/storage": "storage",
         "/about": "about",
@@ -132,7 +135,7 @@ def handle_page_resize(page: ft.Page, app: App) -> Callable:
 
 
 async def main(page: ft.Page) -> None:
-    page.title = "StreamCap"
+    page.title = "录播达人"
 
     _services = BackendServices.get()
     app = App(page, services=_services)
@@ -163,19 +166,18 @@ async def main(page: ft.Page) -> None:
             page.on_resize = handle_page_resize(page, app)
             page.on_disconnect = handle_disconnect(page, app)
 
-        page.add(app.complete_page)
-
         page.on_route_change = handle_route_change(page, app)
         page.window.prevent_close = True
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
-        if page.web:
-            rm = _services.recording_manager
-            if rm is not None and not rm.is_periodic_task_running():
-                logger.info("Starting periodic tasks for the first time in web mode (via session)")
-                page.run_task(app.start_periodic_tasks)
-            else:
-                logger.info("Periodic tasks already running (BackendServices), skipping")
-        else:
+        decision = await app.check_license()
+        await app.apply_license_decision(decision)
+        if decision.allowed and app.commercial_runtime.login_service:
+            await app.commercial_runtime.login_service.restore()
+
+        page.add(app.complete_page)
+        if decision.allowed and page.web:
+            _services.start_background_loop()
+        elif decision.allowed:
             logger.info("Starting periodic tasks in desktop mode")
             page.run_task(app.start_periodic_tasks)
 
@@ -188,7 +190,11 @@ async def main(page: ft.Page) -> None:
 
         page.update()
 
-        if page.route in ["/", ""]:
+        page.run_task(app.start_license_watch)
+
+        if not decision.allowed:
+            await page.push_route("/activation")
+        elif page.route in ["/", ""]:
             last_route = app.settings.user_config.get("last_route", "/home")
             logger.info(f"Restored last route: {last_route}")
             await page.push_route(last_route)
@@ -248,7 +254,6 @@ if __name__ == "__main__":
 
     is_web = args.web or platform == "web"
     if is_web:
-        services.start_background_loop()
         logger.debug("Running in web mode on http://" + args.host + ":" + str(args.port))
         ft.run(
             main=main,

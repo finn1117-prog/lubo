@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: license_db
+      POSTGRES_USER: license_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - license-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U license_app -d license_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://license_app:${POSTGRES_PASSWORD}@postgres:5432/license_db?schema=public
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?set ADMIN_TOKEN in .env}
+      LICENSE_HASH_PEPPER: ${LICENSE_HASH_PEPPER:?set LICENSE_HASH_PEPPER in .env}
+      LICENSE_ED25519_PRIVATE_KEY: ${LICENSE_ED25519_PRIVATE_KEY:?set LICENSE_ED25519_PRIVATE_KEY in .env}
+      OFFLINE_GRACE_DAYS: ${OFFLINE_GRACE_DAYS:-7}
+      PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  license-postgres:

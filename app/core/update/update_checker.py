@@ -63,9 +63,12 @@ class UpdateChecker:
     @staticmethod
     def _load_update_config() -> UpdateConfig:
         auto_check = os.getenv("AUTO_CHECK_UPDATE", "false").lower() == "true"
-        update_source = os.getenv("UPDATE_SOURCE", "both").lower()
-        github_repo = os.getenv("GITHUB_REPO", "ihmily/StreamCap")
-        custom_api = os.getenv("CUSTOM_UPDATE_API", "")
+        update_source = os.getenv("UPDATE_SOURCE", "custom").lower()
+        github_repo = os.getenv("GITHUB_REPO", "")
+        license_server_url = os.getenv("LICENSE_SERVER_URL", "").rstrip("/")
+        custom_api = os.getenv(
+            "CUSTOM_UPDATE_API", f"{license_server_url}/v1/app/version" if license_server_url else ""
+        )
         check_interval = int(os.getenv("UPDATE_CHECK_INTERVAL", "86400"))
 
         update_sources = []
@@ -188,6 +191,17 @@ class UpdateChecker:
                 response = await client.get(source["url"], params={"current_version": self.current_version})
                 if response.status_code == 200:
                     update_info = response.json()
+                    if "version" in update_info:
+                        latest_version = str(update_info["version"])
+                        update_info = {
+                            "has_update": self._compare_versions(latest_version, self.current_version) > 0,
+                            "latest_version": latest_version,
+                            "current_version": self.current_version,
+                            "release_notes": update_info.get("releaseNotes") or "",
+                            "download_url": update_info.get("downloadUrl") or "",
+                            "download_urls": {},
+                            "mandatory": bool(update_info.get("mandatory", False)),
+                        }
                     if update_info.get("has_update", False):
                         return {**update_info, "source": source["name"]}
                     return {"has_update": False, "source": source["name"]}
@@ -284,7 +298,7 @@ class UpdateChecker:
     def open_download_page(self, update_info: dict[str, Any]) -> None:
         import platform
 
-        url = update_info.get("download_url", "https://github.com/ihmily/StreamCap/releases/latest")
+        url = update_info.get("download_url", "")
 
         download_urls = update_info.get("download_urls", {})
         if download_urls:
@@ -296,5 +310,6 @@ class UpdateChecker:
             elif system == "linux" and "linux" in download_urls:
                 url = download_urls["linux"]
 
-        self.app.page.launch_url(url)
+        if url:
+            self.app.page.launch_url(url)
         self.close_dialog()

@@ -2,6 +2,8 @@
   "sidebar": {
     "home": "主页",
     "recordings": "录制",
+    "activation": "会员授权",
+    "platform_login": "平台登录",
     "settings": "设置",
     "storage": "存储",
     "about": "说明",
@@ -13,7 +15,7 @@
     "colors": "颜色列表"
   },
   "home_page": {
-      "welcome": "欢迎使用 StreamCap",
+      "welcome": "欢迎使用录播达人",
       "tagline": "记录直播的每一个精彩瞬间",
       "start_recording": "开始录制",
       "recording_list": "录制列表",
@@ -222,7 +224,7 @@
     "scheduled_shutdown_pick_time": "选择每日关机时间",
     "scheduled_shutdown_more": "打开关机设置",
     "scheduled_shutdown_tip": "启用后，程序将在每天指定时间启动关机倒计时",
-    "scheduled_shutdown_system_message": "StreamCap 定时关机任务已触发，可在 60 秒内取消",
+    "scheduled_shutdown_system_message": "录播达人定时关机任务已触发，可在 60 秒内取消",
     "scheduled_shutdown_countdown": "系统将在 {seconds} 秒后关机。",
     "scheduled_shutdown_cancel": "取消本次关机",
     "scheduled_shutdown_cancelled": "已取消本次关机",
@@ -242,7 +244,7 @@
     "quick_shutdown_cancelled": "已取消快捷关机",
     "quick_shutdown_failed": "无法设置快捷关机：{error}",
     "quick_shutdown_cancel_failed": "无法取消快捷关机：{error}",
-    "quick_shutdown_system_message": "StreamCap 快捷关机：{hours} 小时倒计时",
+    "quick_shutdown_system_message": "录播达人快捷关机：{hours} 小时倒计时",
     "proxy_settings": "代理设置",
     "is_proxy_enabled": "设置是否使用代理及相关配置",
     "enable_proxy": "开启代理",
@@ -526,7 +528,7 @@
     "exit": "退出程序"
   },
   "login_page": {
-    "login_title": "StreamCap 登录",
+    "login_title": "录播达人登录",
     "login_subtitle": "请登录您的账号",
     "username": "用户名",
     "password": "密码",

@@ -947,7 +947,6 @@ class SettingsPage(PageBase):
         platforms = [
             "douyin",
             "tiktok",
-            "kuaishou",
             "huya",
             "douyu",
             "yy",

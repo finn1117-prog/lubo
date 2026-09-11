@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LicenseStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum ActivationEventType {
+  CREATED
+  ACTIVATED
+  VALIDATED
+  DEACTIVATED
+  DISABLED
+  UNBOUND
+  VALIDATION_FAILED
+}
+
+model LicenseCode {
+  id          String            @id @default(uuid())
+  codeHash    String            @unique @map("code_hash")
+  codeHint    String            @map("code_hint")
+  status      LicenseStatus     @default(ACTIVE)
+  maxDevices Int               @default(1) @map("max_devices")
+  note        String?
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  bindings    DeviceBinding[]
+  events      ActivationEvent[]
+
+  @@map("license_codes")
+}
+
+model DeviceBinding {
+  id                    String      @id @default(uuid())
+  licenseId             String      @map("license_id")
+  installationHash      String      @map("installation_hash")
+  deviceFingerprintHash String      @map("device_fingerprint_hash")
+  active                Boolean     @default(true)
+  activatedAt           DateTime    @default(now()) @map("activated_at")
+  lastValidatedAt       DateTime    @default(now()) @map("last_validated_at")
+  deactivatedAt         DateTime?   @map("deactivated_at")
+  license               LicenseCode @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  @@unique([licenseId, installationHash])
+  @@index([licenseId, active])
+  @@map("device_bindings")
+}
+
+model ActivationEvent {
+  id               String              @id @default(uuid())
+  licenseId        String?             @map("license_id")
+  type             ActivationEventType
+  installationHash String?             @map("installation_hash")
+  ipAddress        String?             @map("ip_address")
+  userAgent        String?             @map("user_agent")
+  detail           Json?
+  createdAt        DateTime            @default(now()) @map("created_at")
+  license          LicenseCode?        @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+
+  @@index([licenseId, createdAt])
+  @@map("activation_events")
+}
+
+model AppVersion {
+  channel      String   @id @default("stable")
+  version      String
+  downloadUrl  String?  @map("download_url")
+  releaseNotes String?  @map("release_notes")
+  mandatory    Boolean  @default(false)
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("app_versions")
+}

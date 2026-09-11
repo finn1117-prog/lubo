@@ -19,13 +19,13 @@ VSVersionInfo(
                 StringTable(
                     '040904b0',
                     [
-                        StringStruct('CompanyName', 'io.github.ihmily.streamcap'),
-                        StringStruct('FileDescription', 'Live Stream Recorder'),
+                        StringStruct('CompanyName', '录播达人'),
+                        StringStruct('FileDescription', '录播达人直播自动录制客户端'),
                         StringStruct('FileVersion', '1.0.3'),
-                        StringStruct('InternalName', 'StreamCap'),
-                        StringStruct('LegalCopyright', 'Copyright (C) 2025-2026 by Hmily. All rights reserved.'),
-                        StringStruct('OriginalFilename', 'StreamCap.exe'),
-                        StringStruct('ProductName', 'StreamCap'),
+                        StringStruct('InternalName', 'LuboDaren'),
+                        StringStruct('LegalCopyright', 'Copyright (C) 2026 录播达人. Based on StreamCap by Hmily.'),
+                        StringStruct('OriginalFilename', 'LuboDaren.exe'),
+                        StringStruct('ProductName', '录播达人'),
                         StringStruct('ProductVersion', '1.0.3'),
                     ]
                 )

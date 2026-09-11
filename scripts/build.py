@@ -10,7 +10,7 @@ import sys
 import urllib.request
 from pathlib import Path
 
-APP_NAME = "StreamCap"
+APP_NAME = "LuboDaren"
 ROOT = Path(__file__).resolve().parents[1]
 FLET_ARCHIVE_DIR = ROOT / "build" / "flet_desktop_app"
 VENDOR_DIR = ROOT / "vendor"
@@ -172,6 +172,12 @@ def run_build(args: argparse.Namespace) -> None:
     print(" ".join(command))
     subprocess.run(command, cwd=ROOT, env=env, check=True)
 
+    output_dir = ROOT / "dist" / APP_NAME
+    for legal_file in ("LICENSE", "THIRD_PARTY_NOTICES.md", ".env.example"):
+        source = ROOT / legal_file
+        if source.is_file() and output_dir.is_dir():
+            shutil.copy2(source, output_dir / legal_file)
+
     if target_platform == "macos":
         app_path = ROOT / "dist" / f"{APP_NAME}.app"
         hide_launcher_dock_icon(app_path)
@@ -198,7 +204,7 @@ def hide_launcher_dock_icon(app_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build StreamCap desktop packages with PyInstaller.")
+    parser = argparse.ArgumentParser(description="Build LuboDaren desktop packages with PyInstaller.")
     parser.add_argument("--platform", choices=("macos", "windows"), help="Target platform. Defaults to the host OS.")
     parser.add_argument("--target-arch", choices=("arm64", "x86_64", "universal2"), help="macOS target architecture.")
     parser.add_argument("--refresh-flet", action="store_true", help="Re-download the Flet desktop archive.")

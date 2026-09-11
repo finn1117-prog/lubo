@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-APP_NAME = "StreamCap"
+APP_NAME = "LuboDaren"
 EXECUTABLE_SUFFIX = ".exe" if sys.platform == "win32" else ""
 
 
@@ -52,11 +52,28 @@ def prepare_user_data_dir() -> None:
     if user_data_dir == resource_dir:
         return
 
+    mutable_config_files = {
+        "accounts.json",
+        "cookies.json",
+        "recordings.json",
+        "user_settings.json",
+        "web_auth.json",
+    }
     for directory in ("config", "locales"):
         source = resource_dir / directory
         target = user_data_dir / directory
-        if source.is_dir():
-            shutil.copytree(source, target, dirs_exist_ok=True)
+        if not source.is_dir():
+            continue
+        target.mkdir(parents=True, exist_ok=True)
+        for source_file in source.rglob("*"):
+            if not source_file.is_file():
+                continue
+            relative_path = source_file.relative_to(source)
+            target_file = target / relative_path
+            target_file.parent.mkdir(parents=True, exist_ok=True)
+            if directory == "config" and source_file.name in mutable_config_files and target_file.exists():
+                continue
+            shutil.copy2(source_file, target_file)
 
     prepare_bundled_ffmpeg()
     prepare_bundled_node()

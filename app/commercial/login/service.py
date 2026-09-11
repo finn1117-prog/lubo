@@ -1,0 +1,142 @@
+from __future__ import annotations
+
+import asyncio
+import inspect
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Protocol, runtime_checkable
+
+from .cookies import BrowserCookie, build_cookie_header
+from .errors import LoginDisplayError
+from .models import PlatformProfile
+
+
+class LoginState(StrEnum):
+    SIGNED_OUT = "signed_out"
+    LOADING = "loading"
+    SIGNED_IN = "signed_in"
+    ERROR = "error"
+
+
+@dataclass(frozen=True, slots=True)
+class LoginSnapshot:
+    state: LoginState
+    message: str = ""
+
+
+@runtime_checkable
+class SecureCookieStore(Protocol):
+    def save_cookie(self, platform_key: str, cookie_header: str) -> object | Awaitable[object]: ...
+
+    def load_cookie(self, platform_key: str) -> str | None | Awaitable[str | None]: ...
+
+    def delete_cookie(self, platform_key: str) -> object | Awaitable[object]: ...
+
+
+class BrowserLogin(Protocol):
+    def capture(self, profile: PlatformProfile) -> list[BrowserCookie]: ...
+
+
+RuntimeCookieCallback = Callable[[str, str | None], object | Awaitable[object]]
+StateCallback = Callable[[LoginSnapshot], object | Awaitable[object]]
+
+
+async def _resolve(value):
+    return await value if inspect.isawaitable(value) else value
+
+
+class EncryptedStoreCookieAdapter:
+    """Wrap one ``commercial.security.EncryptedFileStore`` per platform."""
+
+    def __init__(self, store, platform_key: str):
+        self._store = store
+        self._platform_key = platform_key
+
+    def _check_key(self, platform_key: str) -> None:
+        if platform_key != self._platform_key:
+            raise ValueError("Cookie store used with the wrong platform")
+
+    def save_cookie(self, platform_key: str, cookie_header: str) -> None:
+        self._check_key(platform_key)
+        self._store.save({"version": 1, "platform": platform_key, "cookie_header": cookie_header})
+
+    def load_cookie(self, platform_key: str) -> str | None:
+        self._check_key(platform_key)
+        payload = self._store.load()
+        if payload is None:
+            return None
+        if not isinstance(payload, dict) or payload.get("platform") != platform_key:
+            raise RuntimeError("本地登录凭据格式无效")
+        value = payload.get("cookie_header")
+        return value if isinstance(value, str) and value else None
+
+    def delete_cookie(self, platform_key: str) -> None:
+        self._check_key(platform_key)
+        self._store.delete()
+
+
+class CookieLoginService:
+    def __init__(
+        self,
+        profile: PlatformProfile,
+        browser: BrowserLogin,
+        store: SecureCookieStore,
+        runtime_cookie_callback: RuntimeCookieCallback,
+        state_callback: StateCallback | None = None,
+    ):
+        self.profile = profile
+        self._browser = browser
+        self._store = store
+        self._runtime_cookie_callback = runtime_cookie_callback
+        self._state_callback = state_callback
+        self.snapshot = LoginSnapshot(LoginState.SIGNED_OUT, "尚未登录")
+
+    async def _publish(self, state: LoginState, message: str) -> None:
+        self.snapshot = LoginSnapshot(state, message)
+        if self._state_callback:
+            await _resolve(self._state_callback(self.snapshot))
+
+    def set_state_callback(self, callback: StateCallback | None) -> None:
+        self._state_callback = callback
+
+    async def restore(self) -> LoginSnapshot:
+        try:
+            cookie_header = await _resolve(self._store.load_cookie(self.profile.key))
+            if not cookie_header:
+                await self._publish(LoginState.SIGNED_OUT, "尚未登录")
+                return self.snapshot
+            await _resolve(self._runtime_cookie_callback(self.profile.key, cookie_header))
+            await self._publish(LoginState.SIGNED_IN, "已从本机安全存储恢复登录")
+        except Exception:
+            await self._publish(LoginState.ERROR, "无法读取本机登录凭据，请重新登录")
+        return self.snapshot
+
+    async def login(self) -> LoginSnapshot:
+        await self._publish(LoginState.LOADING, f"正在打开{self.profile.display_name}官方登录页…")
+        try:
+            if inspect.iscoroutinefunction(self._browser.capture):
+                cookies = await self._browser.capture(self.profile)
+            else:
+                cookies = await asyncio.to_thread(self._browser.capture, self.profile)
+            cookie_header = build_cookie_header(cookies, self.profile)
+            await _resolve(self._store.save_cookie(self.profile.key, cookie_header))
+            await _resolve(self._runtime_cookie_callback(self.profile.key, cookie_header))
+            await self._publish(LoginState.SIGNED_IN, "登录成功，凭据已加密保存在本机")
+        except LoginDisplayError as exc:
+            await self._publish(LoginState.ERROR, str(exc) or "登录未完成，请重试")
+        except Exception:
+            # Never surface arbitrary exception text: third-party errors can
+            # contain request headers and therefore session cookies.
+            await self._publish(LoginState.ERROR, "登录失败，请检查网络和登录组件后重试")
+        return self.snapshot
+
+    async def logout(self) -> LoginSnapshot:
+        await self._publish(LoginState.LOADING, "正在退出…")
+        try:
+            await _resolve(self._store.delete_cookie(self.profile.key))
+            await _resolve(self._runtime_cookie_callback(self.profile.key, None))
+            await self._publish(LoginState.SIGNED_OUT, "已退出，本机登录凭据已删除")
+        except Exception:
+            await self._publish(LoginState.ERROR, "退出失败，请稍后重试")
+        return self.snapshot

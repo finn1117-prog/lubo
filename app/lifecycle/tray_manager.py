@@ -61,7 +61,7 @@ class TrayManager:
 
             menu = pystray.Menu(pystray.MenuItem(_["restore"], on_restore), pystray.MenuItem(_["exit"], on_exit))
 
-            self.icon = pystray.Icon("StreamCap", self.create_image(), "StreamCap", menu)
+            self.icon = pystray.Icon("LuboDaren", self.create_image(), "录播达人", menu)
             self.is_running = True
             self.icon.run()
         except ImportError as e:

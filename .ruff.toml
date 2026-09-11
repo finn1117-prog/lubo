@@ -76,3 +76,7 @@ ignore = [
     "F401", # unused-import
     "F811", # redefined-while-unused
 ]
+"tests/**/*.py" = [
+    "PT009", # unittest assertions are intentional in inherited IsolatedAsyncioTestCase tests
+    "PT027", # unittest raises assertions are intentional in the same tests
+]
