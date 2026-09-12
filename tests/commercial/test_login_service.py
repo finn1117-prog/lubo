@@ -4,7 +4,7 @@ import multiprocessing
 from app.commercial.login import KUAISHOU_PROFILE, CookieLoginService, LoginState
 from app.commercial.login.cookies import BrowserCookie
 from app.commercial.login.service import EncryptedStoreCookieAdapter
-from app.commercial.login.webview import _wait_for_process_result
+from app.commercial.login.webview import BrowserLoginError, _wait_for_process_result
 from app.commercial.security import EncryptedFileStore
 
 
@@ -121,6 +121,27 @@ def test_arbitrary_adapter_exception_never_leaks_cookie_to_ui():
     assert "TOP_SECRET" not in snapshot.message
 
 
+def test_failed_relogin_keeps_local_credential_and_marks_it_invalid():
+    store = FakeCookieStore()
+    store.values["kuaishou"] = "userId=42; kuaishou.live.web_st=old"
+
+    async def scenario():
+        service = CookieLoginService(
+            KUAISHOU_PROFILE,
+            FakeBrowser(error=BrowserLoginError("browser failed")),
+            store,
+            lambda _key, _value: None,
+        )
+        await service.restore()
+        return await service.login()
+
+    snapshot = asyncio.run(scenario())
+
+    assert snapshot.state == LoginState.INVALID
+    assert snapshot.has_credential
+    assert store.values["kuaishou"].endswith("old")
+
+
 class FakeEncryptedFileStore:
     def __init__(self):
         self.payload = None
@@ -142,6 +163,8 @@ def test_encrypted_file_store_adapter_round_trip():
     adapter.save_cookie("kuaishou", "userId=42")
 
     assert adapter.load_cookie("kuaishou") == "userId=42"
+    assert adapter.verified_at is not None
+    assert encrypted_store.payload["verified_at"] == adapter.verified_at
     adapter.delete_cookie("kuaishou")
     assert adapter.load_cookie("kuaishou") is None
 

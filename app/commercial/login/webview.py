@@ -24,6 +24,25 @@ class BrowserLoginError(LoginDisplayError):
     pass
 
 
+_OPEN_LOGIN_SCRIPT = """
+(() => {
+  const visible = (node) => node && node.getClientRects().length > 0;
+  const nodes = () => Array.from(document.querySelectorAll('button,a,[role="button"],[role="tab"]'));
+  const clickLabel = (labels) => {
+    const candidate = nodes().find((node) => {
+      const text = (node.innerText || node.textContent || '').trim();
+      return visible(node) && labels.some((label) => text === label || text.includes(label));
+    });
+    if (candidate) candidate.click();
+    return Boolean(candidate);
+  };
+  const opened = clickLabel(['登录', '登入', 'Log in', 'Login', 'Sign in']);
+  setTimeout(() => clickLabel(['扫码登录', '二维码登录', '二维码', 'QR code', 'QR Code']), 700);
+  return opened;
+})()
+"""
+
+
 def _wait_for_process_result(process, result_queue, timeout_seconds: float):
     """Drain IPC while the child is alive so a large Cookie payload cannot deadlock on exit."""
     deadline = time.monotonic() + timeout_seconds
@@ -63,11 +82,18 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
 
     def capture_when_authenticated() -> None:
         deadline = time.monotonic() + timeout_seconds
+        login_open_attempted = False
         while not closed.is_set() and time.monotonic() < deadline:
             try:
                 cookies = filter_platform_cookies(normalize_webview_cookies(window.get_cookies()), profile)
                 build_cookie_header(cookies, profile)
             except CookieValidationError:
+                if profile.auto_open_login and not login_open_attempted:
+                    try:
+                        window.evaluate_js(_OPEN_LOGIN_SCRIPT)
+                        login_open_attempted = True
+                    except Exception:
+                        pass
                 time.sleep(1.0)
                 continue
             except Exception:

@@ -56,9 +56,8 @@ class App:
 
         self.settings = SettingsPage(self)
         services.settings_config.adopt_user_config(self.settings.user_config)
-        legacy_kuaishou_cookie = self.settings.cookies_config.pop("kuaishou", "")
-        runtime_cookies = dict(self.settings.cookies_config)
-        services.settings_config.adopt_cookies_config(runtime_cookies)
+        legacy_cookies = dict(self.settings.cookies_config)
+        services.settings_config.adopt_cookies_config(dict(legacy_cookies))
         services.settings_config.adopt_accounts_config(self.settings.accounts_config)
         services.settings_config.language_code = self.settings.language_code or services.settings_config.language_code
         self.language_code = self.settings.language_code
@@ -66,9 +65,11 @@ class App:
         self.commercial_runtime = create_commercial_runtime(
             user_data_dir,
             self._set_runtime_cookie,
-            legacy_kuaishou_cookie,
+            legacy_cookies,
         )
-        if legacy_kuaishou_cookie and self.commercial_runtime.login_service:
+        if legacy_cookies and self.commercial_runtime.login_services:
+            for platform_key in self.commercial_runtime.login_services:
+                self.settings.cookies_config.pop(platform_key, None)
             self.page.run_task(self.config_manager.save_cookies_config, self.settings.cookies_config)
         self.license_service = self.commercial_runtime.license_service
         if not self.commercial_required:
@@ -91,7 +92,7 @@ class App:
         self.home = HomePage(self)
         self.storage = StoragePage(self)
         self.activation = ActivationPage(self)
-        self.platform_login = PlatformLoginPage(self, self.commercial_runtime.login_service)
+        self.platform_login = PlatformLoginPage(self, self.commercial_runtime.login_services)
         self.pages = self.initialize_pages()
         self.sidebar = NavigationSidebar(self)
         self.left_navigation_menu = LeftNavigationMenu(self)
@@ -296,8 +297,10 @@ class App:
         if self.current_page is self.activation:
             await self.activation.show_decision(decision)
         if navigate and decision.allowed:
-            if self.commercial_runtime.login_service:
-                await self.commercial_runtime.login_service.restore()
+            if self.commercial_runtime.login_services:
+                await asyncio.gather(
+                    *(service.restore() for service in self.commercial_runtime.login_services.values())
+                )
             if self.page.web:
                 self.services.start_background_loop()
             elif self.record_manager is not None and not self.record_manager.is_periodic_task_running():

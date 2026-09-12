@@ -48,20 +48,17 @@ class SettingsPage(PageBase):
         self._ = language["settings_page"] | language["video_quality"] | language["base"] | language["sidebar"]
         self.tab_recording = self.create_recording_settings_tab()
         self.tab_push = self.create_push_settings_tab()
-        self.tab_cookies = self.create_cookies_settings_tab()
         self.tab_accounts = self.create_accounts_settings_tab()
         self.page.on_keyboard_event = self.on_keyboard
 
         tab_labels = [
             ft.Tab(label=self._["recording_settings"]),
             ft.Tab(label=self._["push_settings"]),
-            ft.Tab(label=self._["cookies_settings"]),
             ft.Tab(label=self._["accounts_settings"]),
         ]
         tab_contents = [
             self.tab_recording,
             self.tab_push,
-            self.tab_cookies,
             self.tab_accounts,
         ]
 

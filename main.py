@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import multiprocessing
 import os
 import sys
@@ -173,8 +174,8 @@ async def main(page: ft.Page) -> None:
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
         decision = await app.check_license()
         await app.apply_license_decision(decision)
-        if decision.allowed and app.commercial_runtime.login_service:
-            await app.commercial_runtime.login_service.restore()
+        if decision.allowed and app.commercial_runtime.login_services:
+            await asyncio.gather(*(service.restore() for service in app.commercial_runtime.login_services.values()))
 
         page.add(app.complete_page)
         if decision.allowed and page.web:
@@ -242,9 +243,7 @@ if __name__ == "__main__":
     multiprocessing.freeze_support()
 
     dotenv_dir = (
-        Path(sys.executable).resolve().parent
-        if getattr(sys, "frozen", False)
-        else Path(__file__).resolve().parent
+        Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
     )
     load_dotenv(dotenv_dir / ".env")
     platform = os.getenv("PLATFORM")
