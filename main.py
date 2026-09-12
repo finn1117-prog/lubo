@@ -1,7 +1,9 @@
 import argparse
 import multiprocessing
 import os
+import sys
 from collections.abc import Callable
+from pathlib import Path
 
 import flet as ft
 from dotenv import load_dotenv
@@ -196,6 +198,8 @@ async def main(page: ft.Page) -> None:
             await page.push_route("/activation")
         elif page.route in ["/", ""]:
             last_route = app.settings.user_config.get("last_route", "/home")
+            if last_route == "/activation":
+                last_route = "/home"
             logger.info(f"Restored last route: {last_route}")
             await page.push_route(last_route)
 
@@ -237,7 +241,12 @@ async def main(page: ft.Page) -> None:
 if __name__ == "__main__":
     multiprocessing.freeze_support()
 
-    load_dotenv()
+    dotenv_dir = (
+        Path(sys.executable).resolve().parent
+        if getattr(sys, "frozen", False)
+        else Path(__file__).resolve().parent
+    )
+    load_dotenv(dotenv_dir / ".env")
     platform = os.getenv("PLATFORM")
     default_host = os.getenv("HOST", DEFAULT_HOST)
     default_port = int(os.getenv("PORT", DEFAULT_PORT))

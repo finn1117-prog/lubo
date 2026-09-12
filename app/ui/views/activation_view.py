@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import flet as ft
 
-from ...commercial.license import LicenseDecision, LicenseState
+from ...commercial.license import LicenseDecision, LicenseError, LicenseState
+from ...utils.logger import logger
 from ..base_page import PageBase
 
 
@@ -69,8 +70,12 @@ class ActivationPage(PageBase):
         await self._set_loading(True, "正在激活…")
         try:
             decision = await self.app.license_service.activate(self.code_field.value or "")
-        except Exception:
-            decision = LicenseDecision(False, LicenseState.NETWORK_REQUIRED, "激活失败，请检查网络或联系软件提供方")
+        except LicenseError as exc:
+            logger.warning(f"License activation rejected: {exc}")
+            decision = LicenseDecision(False, LicenseState.NETWORK_REQUIRED, f"激活失败：{exc}")
+        except Exception as exc:
+            logger.exception(f"Unexpected license activation error: {exc}")
+            decision = LicenseDecision(False, LicenseState.INVALID, f"激活失败：{exc}")
         await self._set_loading(False)
         await self.app.apply_license_decision(decision, navigate=True)
 
