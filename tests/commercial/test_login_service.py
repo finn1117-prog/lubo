@@ -1,9 +1,33 @@
 import asyncio
+import multiprocessing
 
 from app.commercial.login import KUAISHOU_PROFILE, CookieLoginService, LoginState
 from app.commercial.login.cookies import BrowserCookie
 from app.commercial.login.service import EncryptedStoreCookieAdapter
+from app.commercial.login.webview import _wait_for_process_result
 from app.commercial.security import EncryptedFileStore
+
+
+def _put_large_cookie_payload(result_queue):
+    result_queue.put(("cookies", [{"name": "large", "value": "x" * 1_000_000}]))
+
+
+def test_webview_result_queue_is_drained_before_child_exit():
+    context = multiprocessing.get_context("spawn")
+    result_queue = context.Queue()
+    process = context.Process(target=_put_large_cookie_payload, args=(result_queue,))
+    process.start()
+    try:
+        kind, payload = _wait_for_process_result(process, result_queue, 10)
+        assert kind == "cookies"
+        assert len(payload[0]["value"]) == 1_000_000
+        process.join(5)
+        assert not process.is_alive()
+    finally:
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+        result_queue.close()
 
 
 class FakeBrowser:

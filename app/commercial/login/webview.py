@@ -9,13 +9,33 @@ import time
 from dataclasses import asdict
 from pathlib import Path
 
-from .cookies import BrowserCookie, CookieValidationError, build_cookie_header, normalize_webview_cookies
+from .cookies import (
+    BrowserCookie,
+    CookieValidationError,
+    build_cookie_header,
+    filter_platform_cookies,
+    normalize_webview_cookies,
+)
 from .errors import LoginDisplayError
 from .models import PlatformProfile
 
 
 class BrowserLoginError(LoginDisplayError):
     pass
+
+
+def _wait_for_process_result(process, result_queue, timeout_seconds: float):
+    """Drain IPC while the child is alive so a large Cookie payload cannot deadlock on exit."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BrowserLoginError("登录窗口响应超时，请重试")
+        try:
+            return result_queue.get(timeout=min(0.25, remaining))
+        except queue.Empty:
+            if not process.is_alive():
+                raise BrowserLoginError("登录窗口异常退出，未获取到登录状态")
 
 
 def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, timeout_seconds: float) -> None:
@@ -45,7 +65,7 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
         deadline = time.monotonic() + timeout_seconds
         while not closed.is_set() and time.monotonic() < deadline:
             try:
-                cookies = normalize_webview_cookies(window.get_cookies())
+                cookies = filter_platform_cookies(normalize_webview_cookies(window.get_cookies()), profile)
                 build_cookie_header(cookies, profile)
             except CookieValidationError:
                 time.sleep(1.0)
@@ -96,16 +116,16 @@ class PyWebView2Browser:
             name=f"{profile.key}-login-webview",
         )
         process.start()
-        process.join(self.timeout_seconds + 15)
-        if process.is_alive():
-            process.terminate()
-            process.join(5)
-            raise BrowserLoginError("登录窗口响应超时，请重试")
         try:
-            kind, payload = result_queue.get(timeout=2)
-        except queue.Empty:
-            raise BrowserLoginError("登录窗口已关闭，未获取到登录状态")
+            kind, payload = _wait_for_process_result(process, result_queue, self.timeout_seconds + 15)
+            process.join(5)
+            if process.is_alive():
+                process.terminate()
+                process.join(5)
         finally:
+            if process.is_alive():
+                process.terminate()
+                process.join(5)
             result_queue.close()
         if kind != "cookies":
             raise BrowserLoginError(str(payload))
