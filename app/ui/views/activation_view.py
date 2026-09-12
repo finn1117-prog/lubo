@@ -31,12 +31,40 @@ class ActivationPage(PageBase):
         await self.show_decision(self.app.license_decision)
 
     def _build(self):
+        plans = [
+            ("月卡", "30 天"),
+            ("季卡", "90 天"),
+            ("年卡", "365 天"),
+            ("终身", "199 元"),
+        ]
+        plan_cards = ft.Row(
+            [
+                ft.Container(
+                    width=126,
+                    height=70,
+                    border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
+                    border_radius=12,
+                    padding=10,
+                    content=ft.Column(
+                        [
+                            ft.Text(name, weight=ft.FontWeight.W_600),
+                            ft.Text(detail, size=12, color=ft.Colors.GREY_600),
+                        ],
+                        spacing=3,
+                        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                )
+                for name, detail in plans
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=8,
+        )
         return ft.Container(
             expand=True,
             alignment=ft.alignment.Alignment.CENTER,
             padding=32,
             content=ft.Container(
-                width=560,
+                width=680,
                 padding=32,
                 border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
                 border_radius=18,
@@ -44,7 +72,9 @@ class ActivationPage(PageBase):
                     [
                         ft.Image(src="images/logo-mark.svg", width=64, height=64),
                         ft.Text("激活录播达人", size=28, weight=ft.FontWeight.BOLD),
-                        ft.Text("终身会员 · 199 元 · 默认绑定 1 台设备", color=ft.Colors.GREY_600),
+                        ft.Text("支持月卡、季卡、年卡和终身会员", color=ft.Colors.GREY_600),
+                        plan_cards,
+                        ft.Text("激活码自动识别会员档位 · 默认绑定 1 台设备", size=12, color=ft.Colors.GREY_500),
                         ft.Divider(height=24),
                         self.code_field,
                         ft.Row([self.progress, self.status], spacing=10),

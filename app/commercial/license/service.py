@@ -140,7 +140,10 @@ class LicenseService:
                 "last_seen": _timestamp(trusted_now),
             }
         )
-        return LicenseDecision(True, LicenseState.ACTIVE, "许可证有效", claims)
+        plan_names = {"MONTHLY": "月卡", "QUARTERLY": "季卡", "YEARLY": "年卡", "LIFETIME": "终身"}
+        plan_name = plan_names.get(claims.membership_plan, "会员")
+        expiry = f"，有效期至 {claims.expires_at.astimezone().strftime('%Y-%m-%d')}" if claims.expires_at else ""
+        return LicenseDecision(True, LicenseState.ACTIVE, f"{plan_name}会员有效{expiry}", claims)
 
     def _offline_decision(
         self, state: dict[str, Any], signed: SignedLicense, claims: LicenseClaims, now: datetime

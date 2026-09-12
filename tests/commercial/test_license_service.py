@@ -143,6 +143,7 @@ class LicenseServiceTests(unittest.IsolatedAsyncioTestCase):
             "installationHash": hashlib.sha256(self.installation_id.encode()).hexdigest(),
             "deviceFingerprintHash": hashlib.sha256(self.fingerprint.encode()).hexdigest(),
             "status": "active",
+            "membershipPlan": "YEARLY",
             "issuedAt": self.current.isoformat(),
             "validUntil": (self.current + timedelta(days=365)).isoformat(),
         }
@@ -164,6 +165,8 @@ class LicenseServiceTests(unittest.IsolatedAsyncioTestCase):
         result = await self.service.activate("SECRET-ACTIVATION-CODE")
         self.assertTrue(result.allowed)
         self.assertEqual(result.state, LicenseState.ACTIVE)
+        self.assertEqual(result.claims.membership_plan, "YEARLY")
+        self.assertIn("年卡会员有效", result.reason)
         self.assertNotIn("SECRET-ACTIVATION-CODE", repr(self.store.value))
 
     async def test_network_failure_uses_limited_offline_grace(self):

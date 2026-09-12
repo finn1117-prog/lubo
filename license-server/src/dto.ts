@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { MembershipPlan } from '@prisma/client';
+import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import type { SignedLicense } from './crypto';
 
 export class DeviceDto {
@@ -23,6 +24,7 @@ export class LicenseActionDto extends DeviceDto {
 
 export class BatchLicenseDto {
   @IsInt() @Min(1) @Max(1000) count!: number;
+  @IsOptional() @IsEnum(MembershipPlan) plan?: MembershipPlan;
   @IsOptional() @IsInt() @Min(1) @Max(10) maxDevices?: number;
   @IsOptional() @IsString() @MaxLength(500) note?: string;
 }

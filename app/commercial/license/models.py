@@ -77,6 +77,7 @@ class LicenseClaims:
     issued_at: datetime | None
     expires_at: datetime | None
     offline_grace_until: datetime | None
+    membership_plan: str = "LIFETIME"
     binding_hashed: bool = False
 
     @classmethod
@@ -100,6 +101,7 @@ class LicenseClaims:
                 value.get("expiresAt", value.get("validUntil", value.get("expires_at", value.get("valid_until"))))
             ),
             offline_grace_until=parse_timestamp(value.get("offlineGraceUntil", value.get("offline_grace_until"))),
+            membership_plan=str(value.get("membershipPlan", value.get("membership_plan", "LIFETIME"))).upper(),
             binding_hashed=binding_hashed,
         )
 

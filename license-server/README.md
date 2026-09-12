@@ -6,7 +6,8 @@
 
 - 激活码只以带服务端 pepper 的 HMAC-SHA-256 摘要保存；批量创建时明文只返回一次。
 - `installation_id` 与设备指纹只保存 SHA-256 摘要。
-- 默认每码一台设备；后台可设置上限、禁用和人工解绑。
+- 支持月卡（30 天）、季卡（90 天）、年卡（365 天）和终身会员；有效期从激活码首次激活时开始计算。
+- 默认每码一台设备；后台可设置会员档位、设备上限、禁用和人工解绑。
 - 客户端许可证由 Ed25519 签名，并有有限的离线有效期；联网校验成功会刷新票据。
 - 管理 API 使用恒定时间比较的 Bearer token。生产环境应由 Caddy、Nginx 或云负载均衡器终止 HTTPS，且不要直接暴露容器端口。
 - 私钥、数据库密码、pepper 和管理令牌只从环境变量读取，仓库不提供可用默认值。
@@ -35,7 +36,7 @@
 - `POST /v1/license/validate`：`{ license: { algorithm, payload, signature }, installationId, deviceFingerprint }`
 - `POST /v1/license/deactivate`：请求体同 validate
 - `GET /v1/app/version?channel=stable`
-- `POST /admin/licenses/batch`：`{ count, maxDevices?, note? }`；明文激活码只在该响应出现
+- `POST /admin/licenses/batch`：`{ count, plan?, maxDevices?, note? }`；`plan` 可选 `MONTHLY`、`QUARTERLY`、`YEARLY` 或 `LIFETIME`，省略时兼容为终身会员；明文激活码只在该响应出现
 - `GET /admin/licenses?search=...`
 - `GET /admin/events?licenseId=...`
 - `POST /admin/licenses/:id/disable`

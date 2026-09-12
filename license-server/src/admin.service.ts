@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { ActivationEventType, LicenseStatus } from '@prisma/client';
+import { ActivationEventType, LicenseStatus, MembershipPlan } from '@prisma/client';
 import { AppConfig } from './config';
 import { generateActivationCode, keyedHash } from './crypto';
 import { BatchLicenseDto, SetVersionDto } from './dto';
@@ -13,13 +13,15 @@ export class AdminService {
   async createBatch(input: BatchLicenseDto, context: AuditContext) {
     const codes = Array.from({ length: input.count }, generateActivationCode);
     const maxDevices = input.maxDevices ?? 1;
+    const plan = input.plan ?? MembershipPlan.LIFETIME;
     const created = await this.prisma.$transaction(codes.map((code) => this.prisma.licenseCode.create({
       data: {
         codeHash: keyedHash(code.replace(/-/g, ''), this.config.hashPepper),
         codeHint: code.slice(-5),
+        plan,
         maxDevices,
         note: input.note,
-        events: { create: { type: ActivationEventType.CREATED, detail: { batchSize: input.count }, ...context } },
+        events: { create: { type: ActivationEventType.CREATED, detail: { batchSize: input.count, plan }, ...context } },
       },
       select: { id: true },
     })));

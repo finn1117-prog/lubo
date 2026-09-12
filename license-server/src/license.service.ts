@@ -5,6 +5,7 @@ import { keyedHash, LicenseClaims, SignedLicense, signLicense, stableHash, verif
 import { ActivateDto, LicenseActionDto } from './dto';
 import { PrismaService } from './prisma.service';
 import type { AuditContext } from './request-context';
+import { membershipExpiry } from './membership-plans';
 
 @Injectable()
 export class LicenseService {
@@ -17,17 +18,18 @@ export class LicenseService {
     };
   }
 
-  private issue(licenseId: string, installationHash: string, deviceFingerprintHash: string): SignedLicense {
+  private issue(license: { id: string; plan: import('@prisma/client').MembershipPlan; expiresAt: Date | null }, installationHash: string, deviceFingerprintHash: string): SignedLicense {
     const now = new Date();
     const offlineGraceUntil = new Date(now.getTime() + this.config.offlineGraceDays * 86_400_000);
     const claims: LicenseClaims = {
       version: 1,
-      licenseId,
+      licenseId: license.id,
       installationHash,
       deviceFingerprintHash,
       status: 'active',
+      membershipPlan: license.plan,
       issuedAt: now.toISOString(),
-      expiresAt: null,
+      expiresAt: license.expiresAt?.toISOString() ?? null,
       offlineGraceUntil: offlineGraceUntil.toISOString(),
     };
     return signLicense(claims, this.config.privateKeyPem);
@@ -38,8 +40,17 @@ export class LicenseService {
     const identity = this.identity(input);
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const license = await tx.licenseCode.findUnique({ where: { codeHash } });
+      let license = await tx.licenseCode.findUnique({ where: { codeHash } });
       if (!license || license.status !== LicenseStatus.ACTIVE) throw new UnauthorizedException('Activation code is invalid or disabled');
+
+      const now = new Date();
+      if (!license.activatedAt) {
+        license = await tx.licenseCode.update({
+          where: { id: license.id },
+          data: { activatedAt: now, expiresAt: membershipExpiry(license.plan, now) },
+        });
+      }
+      if (license.expiresAt && license.expiresAt <= now) throw new UnauthorizedException('Membership has expired');
 
       const existing = await tx.deviceBinding.findUnique({
         where: { licenseId_installationHash: { licenseId: license.id, installationHash: identity.installationHash } },
@@ -62,7 +73,7 @@ export class LicenseService {
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return {
-      license: this.issue(result.id, identity.installationHash, identity.deviceFingerprintHash),
+      license: this.issue(result, identity.installationHash, identity.deviceFingerprintHash),
       publicKey: this.config.publicKeyPem,
       offlineGraceDays: this.config.offlineGraceDays,
       serverTime: new Date().toISOString(),
@@ -81,11 +92,14 @@ export class LicenseService {
       });
       throw new UnauthorizedException('License is inactive or does not match this device');
     }
+    if (binding.license.expiresAt && binding.license.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Membership has expired');
+    }
     await this.prisma.$transaction([
       this.prisma.deviceBinding.update({ where: { id: binding.id }, data: { lastValidatedAt: new Date() } }),
       this.prisma.activationEvent.create({ data: { licenseId: binding.licenseId, type: ActivationEventType.VALIDATED, installationHash: claims.installationHash, ...context } }),
     ]);
-    return { valid: true, license: this.issue(binding.licenseId, claims.installationHash, claims.deviceFingerprintHash), serverTime: new Date().toISOString() };
+    return { valid: true, license: this.issue(binding.license, claims.installationHash, claims.deviceFingerprintHash), serverTime: new Date().toISOString() };
   }
 
   async deactivate(input: LicenseActionDto, context: AuditContext) {

@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomBytes, sign, verify } from 'node:crypto';
+import type { MembershipPlan } from '@prisma/client';
 
 export interface LicenseClaims {
   version: 1;
@@ -6,8 +7,9 @@ export interface LicenseClaims {
   installationHash: string;
   deviceFingerprintHash: string;
   status: 'active';
+  membershipPlan?: MembershipPlan;
   issuedAt: string;
-  expiresAt: null;
+  expiresAt: string | null;
   offlineGraceUntil: string;
 }
 

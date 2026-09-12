@@ -73,63 +73,72 @@ class PlatformLoginPage(PageBase):
         progress = ft.ProgressRing(width=18, height=18, stroke_width=2, visible=False)
         login_button = ft.Button(
             "登录",
-            icon=ft.Icons.LOGIN,
             data=key,
             on_click=self.on_login,
-            width=104,
+            width=96,
             height=36,
+            style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=12)),
         )
         logout_button = ft.TextButton(
             "退出",
-            icon=ft.Icons.LOGOUT,
             data=key,
             on_click=self.on_logout,
             visible=False,
-            width=104,
-            height=32,
+            width=64,
+            height=36,
+            style=ft.ButtonStyle(padding=ft.Padding.symmetric(horizontal=8)),
         )
         hint = "优先进入二维码登录" if service.profile.prefer_qr else "进入官方登录页面"
+        fallback_icon = ft.Container(
+            width=44,
+            height=44,
+            border_radius=12,
+            bgcolor=ft.Colors.BLUE_600,
+            alignment=ft.alignment.Alignment.CENTER,
+            content=ft.Text(
+                service.profile.display_name[:1],
+                color=ft.Colors.WHITE,
+                weight=ft.FontWeight.BOLD,
+            ),
+        )
         card = ft.Card(
             content=ft.Container(
                 padding=ft.Padding.symmetric(horizontal=20, vertical=16),
                 content=ft.Row(
                     [
-                        ft.Container(
-                            width=40,
-                            height=40,
-                            border_radius=12,
-                            bgcolor=ft.Colors.BLUE_600,
-                            alignment=ft.alignment.Alignment.CENTER,
-                            content=ft.Text(
-                                service.profile.display_name[:1],
-                                color=ft.Colors.WHITE,
-                                weight=ft.FontWeight.BOLD,
-                            ),
+                        ft.Image(
+                            src=f"platform_icons/{key}.png",
+                            width=44,
+                            height=44,
+                            fit=ft.BoxFit.CONTAIN,
+                            border_radius=10,
+                            error_content=fallback_icon,
+                            semantics_label=f"{service.profile.display_name}官方图标",
                         ),
                         ft.Column(
                             [
                                 ft.Text(service.profile.display_name, size=17, weight=ft.FontWeight.W_600),
                                 ft.Text(hint, size=12, color=ft.Colors.GREY_500),
                             ],
-                            width=130,
+                            width=112,
                             spacing=3,
                         ),
                         ft.Column(
                             [ft.Text("本地凭证", size=11, color=ft.Colors.GREY_500), credential],
-                            width=90,
+                            width=75,
                         ),
                         ft.Column(
                             [
                                 ft.Text("状态", size=11, color=ft.Colors.GREY_500),
                                 ft.Row([progress, status]),
                             ],
-                            width=115,
+                            width=86,
                         ),
                         ft.Column(
                             [ft.Text("最近验证", size=11, color=ft.Colors.GREY_500), verified],
-                            width=120,
+                            width=112,
                         ),
-                        ft.Column([login_button, logout_button], spacing=0, width=104),
+                        ft.Row([login_button, logout_button], spacing=6, width=166),
                     ],
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=10,

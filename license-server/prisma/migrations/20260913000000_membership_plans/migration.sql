@@ -1,0 +1,7 @@
+CREATE TYPE "MembershipPlan" AS ENUM ('MONTHLY', 'QUARTERLY', 'YEARLY', 'LIFETIME');
+
+ALTER TABLE "license_codes"
+ADD COLUMN "plan" "MembershipPlan" NOT NULL DEFAULT 'LIFETIME',
+ADD COLUMN "activated_at" TIMESTAMP(3),
+ADD COLUMN "expires_at" TIMESTAMP(3);
+
