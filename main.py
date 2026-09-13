@@ -170,30 +170,13 @@ async def main(page: ft.Page) -> None:
             page.on_disconnect = handle_disconnect(page, app)
 
         page.on_route_change = handle_route_change(page, app)
-        page.window.prevent_close = True
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
-        decision = await app.check_license()
-        await app.apply_license_decision(decision)
-        if app.commercial_runtime.login_services:
-            await asyncio.gather(*(service.restore() for service in app.commercial_runtime.login_services.values()))
-
+        # Let the native close button work until the first application frame is
+        # visible.  Otherwise a slow startup dependency can leave the Flet
+        # "Working..." screen both blocked and impossible to close normally.
+        page.window.prevent_close = False
         page.add(app.complete_page)
-        if page.web:
-            _services.start_background_loop()
-        else:
-            logger.info("Starting periodic tasks in desktop mode")
-            page.run_task(app.start_periodic_tasks)
-
-            if page.platform and page.platform.value == "windows":
-                if app.tray_manager is not None:
-                    try:
-                        app.tray_manager.start(page)
-                    except Exception as err:
-                        logger.error(f"Failed to start tray manager: {err}")
-
         page.update()
-
-        page.run_task(app.start_license_watch)
 
         if page.route in ["/", ""]:
             last_route = app.settings.user_config.get("last_route", "/home")
@@ -204,6 +187,45 @@ async def main(page: ft.Page) -> None:
 
         if page.web:
             page.run_task(app.switch_page, page.route[1:])
+
+        page.window.prevent_close = True
+        page.update()
+
+        async def finish_startup() -> None:
+            """Restore optional online services without delaying the first frame."""
+            try:
+                decision = await app.check_license()
+                await app.apply_license_decision(decision)
+            except Exception as exc:
+                logger.error(f"Background license initialization failed: {exc}")
+
+            login_services = app.commercial_runtime.login_services.values()
+            if login_services:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*(service.restore() for service in login_services)),
+                        timeout=5,
+                    )
+                except TimeoutError:
+                    logger.warning("Platform login restoration timed out; continuing startup")
+                except Exception as exc:
+                    logger.error(f"Platform login restoration failed: {exc}")
+
+            if page.web:
+                _services.start_background_loop()
+            else:
+                logger.info("Starting periodic tasks in desktop mode")
+                page.run_task(app.start_periodic_tasks)
+
+                if page.platform and page.platform.value == "windows" and app.tray_manager is not None:
+                    try:
+                        app.tray_manager.start(page)
+                    except Exception as err:
+                        logger.error(f"Failed to start tray manager: {err}")
+
+            page.run_task(app.start_license_watch)
+
+        page.run_task(finish_startup)
 
     if page.web:
         auth_manager = AuthManager(app)
