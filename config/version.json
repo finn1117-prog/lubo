@@ -1,7 +1,7 @@
 {
   "introduction": {
     "en": "LuboDaren is a local-first live stream recording application based on StreamCap. Recordings stay on the user's computer and platform credentials are never sent to the license service.",
-    "zh_CN": "录播达人是一款基于 StreamCap 二次开发的本地优先直播录制软件。录像只保存在用户电脑中，平台登录凭据不会发送到授权服务器。"
+    "zh_CN": "录播达人是一款支持多平台的直播录制软件，可自动监控直播状态并录制保存。\n所有录制内容仅保存在您的本地电脑中，安全、私密、可控。"
   },
   "open_source_license": "Apache License 2.0",
   "version_updates": [
