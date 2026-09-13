@@ -38,6 +38,13 @@ class RecordingManager:
         bridges = self.services.snapshot_bridges()
         return bridges[0] if bridges else None
 
+    @staticmethod
+    def _stream_fetch_failed(stream_info) -> bool:
+        """A stopped stream may validly omit its anchor name."""
+        if stream_info is None:
+            return True
+        return bool(stream_info.is_live and not stream_info.anchor_name)
+
     @property
     def recordings(self):
         return GlobalRecordingState.recordings
@@ -335,7 +342,7 @@ class RecordingManager:
         async with semaphore:
             stream_info = await recorder.fetch_stream()
             logger.info(f"Stream Data: {stream_info}")
-        if not stream_info or not stream_info.anchor_name:
+        if self._stream_fetch_failed(stream_info):
             logger.error(f"Fetch stream data failed: {recording.url}")
             recording.is_checking = False
             recording.status_info = RecordingStatus.LIVE_STATUS_CHECK_ERROR
@@ -343,7 +350,7 @@ class RecordingManager:
                 self.services.broadcast_card_update(recording)
                 self.services.broadcast_pubsub("update", recording)
             return
-        if self.settings.user_config.get("remove_emojis"):
+        if self.settings.user_config.get("remove_emojis") and stream_info.anchor_name:
             stream_info.anchor_name = utils.clean_name(stream_info.anchor_name, self._["live_room"])
 
         if stream_info.is_live:
