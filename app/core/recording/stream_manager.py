@@ -266,6 +266,7 @@ class LiveStreamRecorder:
         save_path = self._get_save_path(filename, use_direct_download)
         logger.info(f"Save Path: {save_path}")
         self.recording.recording_dir = os.path.dirname(save_path)
+        self.recording.begin_transfer(save_path)
         os.makedirs(self.recording.recording_dir, exist_ok=True)
         record_url = self._get_record_url(stream_info)
         self.set_preview_url(stream_info)

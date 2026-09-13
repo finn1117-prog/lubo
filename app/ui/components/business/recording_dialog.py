@@ -428,7 +428,7 @@ class RecordingDialog:
                         "video_bitrate": video_bitrate,
                         "quality_info": quality_info,
                         "title": title,
-                        "speed": "X KB/s",
+                        "speed": "等待录制",
                         "segment_record": segment_input.visible,
                         "segment_time": segment_input.value,
                         "monitor_status": initial_values.get("monitor_status", True),

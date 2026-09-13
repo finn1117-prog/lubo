@@ -1,3 +1,6 @@
+import glob
+import os
+import time
 from datetime import timedelta
 
 
@@ -60,7 +63,10 @@ class Recording:
         self.video_bitrate = video_bitrate
         self.scheduled_time_range = None
         self.title = f"{streamer_name} - {self.quality}"
-        self.speed = "X KB/s"
+        self.speed = "等待录制"
+        self.current_output_path = None
+        self._speed_sample_bytes = None
+        self._speed_sample_time = None
         self.is_live = False
         self.is_recording = False
         self.start_time = None
@@ -86,6 +92,45 @@ class Recording:
         self.use_proxy = None
         self.record_url = None
         self.preview_url = None
+
+    def begin_transfer(self, output_path: str) -> None:
+        self.current_output_path = output_path
+        self._speed_sample_bytes = None
+        self._speed_sample_time = None
+        self.speed = "计算中…"
+
+    def update_transfer_speed(self, now: float | None = None) -> str:
+        if not self.is_recording or not self.current_output_path:
+            self._speed_sample_bytes = None
+            self._speed_sample_time = None
+            self.speed = "等待录制"
+            return self.speed
+
+        paths = [self.current_output_path]
+        if "%" in self.current_output_path:
+            paths = glob.glob(f"{self.current_output_path.split('%', 1)[0]}*")
+        total_bytes = sum(os.path.getsize(path) for path in paths if os.path.isfile(path))
+        sampled_at = time.monotonic() if now is None else now
+        if self._speed_sample_bytes is None or self._speed_sample_time is None:
+            self._speed_sample_bytes = total_bytes
+            self._speed_sample_time = sampled_at
+            self.speed = "计算中…"
+            return self.speed
+
+        elapsed = sampled_at - self._speed_sample_time
+        bytes_per_second = max(0.0, total_bytes - self._speed_sample_bytes) / elapsed if elapsed > 0 else 0.0
+        self._speed_sample_bytes = total_bytes
+        self._speed_sample_time = sampled_at
+        self.speed = self._format_transfer_speed(bytes_per_second)
+        return self.speed
+
+    @staticmethod
+    def _format_transfer_speed(bytes_per_second: float) -> str:
+        if bytes_per_second >= 1024 * 1024:
+            return f"{bytes_per_second / (1024 * 1024):.2f} MB/s"
+        if bytes_per_second >= 1024:
+            return f"{bytes_per_second / 1024:.1f} KB/s"
+        return f"{bytes_per_second:.0f} B/s"
 
     def to_dict(self):
         """Convert the Recording instance to a dictionary for saving."""

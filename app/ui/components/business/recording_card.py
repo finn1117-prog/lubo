@@ -415,11 +415,22 @@ class RecordingCardManager:
                     duration_label = self.cards_obj[recording.rec_id]["duration_label"]
                     duration_label.value = self.app.record_manager.get_duration(recording)
                     duration_label.update()
+                    speed_label = self.cards_obj[recording.rec_id]["speed_label"]
+                    speed_label.value = recording.update_transfer_speed()
+                    speed_label.update()
                 except (ft.FletPageDisconnectedException, AssertionError) as e:
                     logger.debug(f"Update duration failed: {e}")
                     break
                 except Exception as e:
                     logger.debug(f"Update duration failed: {e}")
+            elif recording.speed != "等待录制":
+                recording.update_transfer_speed()
+                try:
+                    speed_label = self.cards_obj[recording.rec_id]["speed_label"]
+                    speed_label.value = recording.speed
+                    speed_label.update()
+                except (ft.FletPageDisconnectedException, AssertionError):
+                    break
 
     def start_update_task(self, recording: Recording):
         """Start a background task to update the duration text."""
