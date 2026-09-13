@@ -169,6 +169,20 @@ def test_encrypted_file_store_adapter_round_trip():
     assert adapter.load_cookie("kuaishou") is None
 
 
+def test_legacy_xiaohongshu_guest_cookie_is_removed():
+    encrypted_store = FakeEncryptedFileStore()
+    encrypted_store.payload = {
+        "version": 1,
+        "platform": "xhs",
+        "cookie_header": "web_session=guest",
+        "verified_at": "2026-09-13T00:00:00+00:00",
+    }
+    adapter = EncryptedStoreCookieAdapter(encrypted_store, "xhs")
+
+    assert adapter.load_cookie("xhs") is None
+    assert encrypted_store.payload is None
+
+
 class XorProtector:
     def protect(self, plaintext):
         return bytes(value ^ 0xA5 for value in plaintext)

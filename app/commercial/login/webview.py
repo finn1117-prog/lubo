@@ -129,6 +129,10 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
             try:
                 cookies = filter_platform_cookies(normalize_webview_cookies(window.get_cookies()), profile)
                 build_cookie_header(cookies, profile)
+                if profile.authentication_probe_script:
+                    authenticated = window.evaluate_js(profile.authentication_probe_script)
+                    if authenticated is not True:
+                        raise CookieValidationError("页面尚未完成登录")
             except CookieValidationError:
                 if profile.auto_open_login and not login_open_attempted:
                     try:

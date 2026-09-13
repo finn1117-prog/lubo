@@ -15,6 +15,7 @@ class PlatformProfile:
     authentication_cookie_groups: tuple[frozenset[str], ...]
     prefer_qr: bool = False
     auto_open_login: bool = False
+    authentication_probe_script: str | None = None
 
     def __post_init__(self) -> None:
         parsed = urlsplit(self.login_url)
@@ -32,6 +33,7 @@ def _p(
     *cookie_groups: tuple[str, ...],
     qr: bool = False,
     auto: bool = False,
+    probe: str | None = None,
 ) -> PlatformProfile:
     return PlatformProfile(
         key=key,
@@ -41,7 +43,20 @@ def _p(
         authentication_cookie_groups=tuple(frozenset(value.casefold() for value in group) for group in cookie_groups),
         prefer_qr=qr,
         auto_open_login=auto,
+        authentication_probe_script=probe,
     )
+
+
+_XHS_AUTHENTICATION_PROBE = """
+(() => {
+  const unwrap = (value) => value && typeof value === 'object' && 'value' in value ? value.value : value;
+  const state = unwrap(window.__INITIAL_STATE__);
+  const userState = unwrap(state && state.user);
+  const userInfo = unwrap(userState && (userState.userInfo || userState.user_info));
+  if (!userInfo || typeof userInfo !== 'object') return false;
+  return Boolean(userInfo.userId || userInfo.user_id || userInfo.redId || userInfo.red_id);
+})()
+"""
 
 
 # Complete set of keys from the former Cookie Settings page, plus Kuaishou
@@ -87,6 +102,7 @@ PLATFORM_PROFILES: tuple[PlatformProfile, ...] = (
         ("web_session",),
         qr=True,
         auto=True,
+        probe=_XHS_AUTHENTICATION_PROBE,
     ),
     _p("bigo", "Bigo", "https://www.bigo.tv/", ("bigo.tv",), ("bigo_userid",), ("access_token",), auto=True),
     _p("blued", "Blued", "https://app.blued.cn/", ("blued.cn",), ("access_token",), ("blued_uid",), auto=True),

@@ -72,7 +72,7 @@ class EncryptedStoreCookieAdapter:
         self.verified_at = datetime.now(timezone.utc).isoformat()
         self._store.save(
             {
-                "version": 1,
+                "version": 2,
                 "platform": platform_key,
                 "cookie_header": cookie_header,
                 "verified_at": self.verified_at,
@@ -86,6 +86,9 @@ class EncryptedStoreCookieAdapter:
             return None
         if not isinstance(payload, dict) or payload.get("platform") != platform_key:
             raise RuntimeError("本地登录凭据格式无效")
+        if platform_key == "xhs" and payload.get("version", 1) < 2:
+            self._store.delete()
+            return None
         timestamp = payload.get("verified_at")
         self.verified_at = timestamp if isinstance(timestamp, str) else None
         value = payload.get("cookie_header")

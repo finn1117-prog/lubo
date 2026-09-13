@@ -69,6 +69,10 @@ def test_every_platform_profile_has_secure_login_and_validation_rules():
         assert all(group for group in profile.authentication_cookie_groups)
 
 
+def test_xiaohongshu_requires_page_level_authentication_confirmation():
+    assert PLATFORM_PROFILE_BY_KEY["xhs"].authentication_probe_script
+
+
 def test_settings_page_no_longer_builds_cookie_settings_tab():
     load_source = inspect.getsource(SettingsPage.load)
 
