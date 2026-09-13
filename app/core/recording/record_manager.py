@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 
 from ...messages import desktop_notify, message_pusher
+from ...models.media.video_quality_model import VideoQuality
 from ...models.recording.recording_model import Recording
 from ...models.recording.recording_status_model import RecordingStatus
 from ...utils import utils
@@ -18,7 +19,15 @@ class GlobalRecordingState:
     lock = threading.Lock()
 
 
+class FreeTierLimitError(ValueError):
+    """Raised when an unlicensed client exceeds a free recording entitlement."""
+
+
 class RecordingManager:
+    FREE_MAX_RECORDINGS = 1
+    FREE_QUALITY = VideoQuality.SD
+    FREE_RESTRICTED_QUALITIES = frozenset({VideoQuality.OD, VideoQuality.UHD, VideoQuality.HD})
+
     def __init__(self, services):
         self.services = services
         self.settings = services.settings_config
@@ -74,8 +83,47 @@ class RecordingManager:
             recording.update_title(self._.get(recording.quality, recording.quality))
             recording.showed_checking_status = True
 
+    @property
+    def membership_active(self) -> bool:
+        return bool(getattr(self.services, "membership_active", False))
+
+    def is_recording_entitled(self, recording: Recording) -> bool:
+        """Return whether this task may run under the current membership.
+
+        Existing paid configurations are retained when membership expires, but
+        only the first task can be used until membership is restored.
+        """
+        if self.membership_active:
+            return True
+        try:
+            return self.recordings.index(recording) < self.FREE_MAX_RECORDINGS
+        except ValueError:
+            return len(self.recordings) < self.FREE_MAX_RECORDINGS
+
+    def effective_recording_quality(self, recording: Recording) -> str:
+        """Return the quality used for this run without overwriting the saved preference."""
+        if not self.membership_active and recording.quality in self.FREE_RESTRICTED_QUALITIES:
+            return self.FREE_QUALITY
+        return recording.quality
+
+    def allows_automatic_monitoring(self) -> bool:
+        return self.membership_active
+
+    def enforce_current_entitlements(self) -> None:
+        """Stop runs that became unavailable after membership expired."""
+        if self.membership_active:
+            return
+
+        for index, recording in enumerate(self.recordings):
+            exceeds_room_limit = index >= self.FREE_MAX_RECORDINGS
+            exceeds_quality_limit = recording.quality in self.FREE_RESTRICTED_QUALITIES
+            if recording.is_recording and (exceeds_room_limit or exceeds_quality_limit):
+                self.stop_recording(recording, manually_stopped=True)
+
     async def add_recording(self, recording):
         with GlobalRecordingState.lock:
+            if not self.membership_active and len(GlobalRecordingState.recordings) >= self.FREE_MAX_RECORDINGS:
+                raise FreeTierLimitError("免费版最多可添加 1 个直播间，请激活会员后添加更多直播间")
             GlobalRecordingState.recordings.append(recording)
             await self.persist_recordings()
 
@@ -117,6 +165,10 @@ class RecordingManager:
         """
         Start monitoring a single recording if it is not already being monitored.
         """
+        if not self.allows_automatic_monitoring():
+            raise FreeTierLimitError("免费版不支持 24 小时自动监控，请手动开始单次录制")
+        if not self.is_recording_entitled(recording):
+            raise FreeTierLimitError("免费版只能使用第 1 个直播间，请激活会员后使用更多直播间")
         if not recording.monitor_status:
             recording.is_checking = True
             recording.is_live = False
@@ -132,7 +184,7 @@ class RecordingManager:
             self.services.broadcast_card_update(recording)
             self.services.broadcast_pubsub("update", recording)
 
-            self.services.run_coro(self.check_if_live(recording))
+            self.services.run_coro(self.check_if_live(recording, automatic=False))
 
             if auto_save:
                 self.services.run_coro(self.persist_recordings())
@@ -221,6 +273,9 @@ class RecordingManager:
 
     async def check_all_live_status(self):
         """Check the live status of all recordings and update their display titles."""
+        if not self.allows_automatic_monitoring():
+            logger.debug("Free tier: skipped periodic live monitoring")
+            return
         for recording in self.recordings:
             if recording.monitor_status and not recording.is_recording:
                 is_exceeded = utils.is_time_interval_exceeded(recording.detection_time, recording.loop_time_seconds)
@@ -262,9 +317,19 @@ class RecordingManager:
         else:
             logger.info("Periodic live check task already running globally, skipping initialization")
 
-    async def check_if_live(self, recording: Recording):
-        """Check if the live stream is available, fetch stream data and update is_live status."""
+    async def check_if_live(self, recording: Recording, *, automatic: bool = True):
+        """Check a stream once; automatic checks require an active membership."""
 
+        if automatic and not self.allows_automatic_monitoring():
+            logger.debug(f"Free tier: skipped automatic stream check {recording.rec_id}")
+            return
+
+        if not self.is_recording_entitled(recording):
+            logger.info(f"Free tier: blocked extra recording task {recording.rec_id}")
+            recording.is_checking = False
+            recording.status_info = RecordingStatus.STOPPED_MONITORING
+            self.services.broadcast_card_update(recording)
+            return
         recording.manually_stopped = False
         if recording.is_recording or recording.stopping_in_progress:
             logger.debug(f"Skip check_if_live because recording is busy: {recording.url}")
@@ -325,6 +390,7 @@ class RecordingManager:
             recording.is_checking = False
             recording.status_info = RecordingStatus.NOT_RECORDING_SPACE
             return
+        effective_quality = self.effective_recording_quality(recording)
         recording_info = {
             "platform": platform,
             "platform_key": platform_key,
@@ -333,7 +399,7 @@ class RecordingManager:
             "segment_record": recording.segment_record,
             "segment_time": recording.segment_time,
             "save_format": recording.record_format,
-            "quality": recording.quality,
+            "quality": effective_quality,
             "video_bitrate": recording.video_bitrate,
         }
 
@@ -357,7 +423,7 @@ class RecordingManager:
             recording.live_title = stream_info.title
             if recording.streamer_name.strip() == self._["live_room"]:
                 recording.streamer_name = stream_info.anchor_name
-            recording.title = f"{recording.streamer_name} - {self._[recording.quality]}"
+            recording.title = f"{recording.streamer_name} - {self._[effective_quality]}"
             recording.display_title = f"[{self._['is_live']}] {recording.title}"
 
             if not recording.is_live:
@@ -419,7 +485,7 @@ class RecordingManager:
                 asyncio.create_task(recorder.end_message_push())
 
             recording.status_info = RecordingStatus.MONITORING
-            title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[recording.quality]}"
+            title = f"{stream_info.anchor_name or recording.streamer_name} - {self._[effective_quality]}"
             if recording.streamer_name == self._["live_room"] or f"[{self._['is_live']}]" in recording.display_title:
                 recording.update(
                     {

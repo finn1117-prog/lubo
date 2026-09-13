@@ -239,9 +239,22 @@ class AboutPage(PageBase):
             else label("会员", "Member")
         )
         license_name = (
-            f"{plan}{'会员' if zh else ' member'}" if decision.allowed else label("尚未激活", "Not activated")
+            f"{plan}{'会员' if zh else ' member'}" if decision.allowed else label("免费版", "Free edition")
         )
         status_color = ft.Colors.GREEN if decision.allowed else ft.Colors.ORANGE
+        license_description = (
+            label("当前设备已激活", "This device is activated")
+            if decision.allowed
+            else label(
+                "可录制 1 个直播间 · 不支持原画高清与 24 小时监控",
+                "Record 1 live room · Original quality and 24/7 monitoring require membership",
+            )
+        )
+        license_action = (
+            label("管理授权", "Manage license")
+            if decision.allowed
+            else label("激活会员", "Activate membership")
+        )
 
         version_card = card(
             ft.Column(
@@ -273,19 +286,17 @@ class AboutPage(PageBase):
         license_card = card(
             ft.Column(
                 [
-                    title(ft.Icons.VERIFIED_USER_OUTLINED, label("软件授权状态", "License status"), ft.Colors.AMBER),
+                    title(
+                        ft.Icons.VERIFIED_USER_OUTLINED,
+                        label("会员与授权", "Membership and license"),
+                        ft.Colors.AMBER,
+                    ),
                     ft.Row(
                         [
                             ft.Column(
                                 [
                                     ft.Text(license_name, size=19, weight=ft.FontWeight.BOLD, color=status_color),
-                                    ft.Text(
-                                        label("当前设备已激活", "This device is activated")
-                                        if decision.allowed
-                                        else decision.reason,
-                                        size=12,
-                                        color=muted,
-                                    ),
+                                    ft.Text(license_description, size=12, color=muted),
                                 ],
                                 spacing=2,
                                 expand=True,
@@ -298,10 +309,12 @@ class AboutPage(PageBase):
                         ]
                     ),
                     ft.Button(
-                        label("管理授权", "Manage license"),
-                        icon=ft.Icons.PERSON_OUTLINE,
+                        license_action,
+                        icon=ft.Icons.PERSON_OUTLINE if decision.allowed else ft.Icons.VERIFIED_USER_OUTLINED,
                         on_click=self.open_activation,
                         width=float("inf"),
+                        bgcolor=None if decision.allowed else "#6D4AFF",
+                        color=None if decision.allowed else ft.Colors.WHITE,
                     ),
                 ],
                 spacing=13,

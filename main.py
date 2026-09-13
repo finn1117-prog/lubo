@@ -174,13 +174,13 @@ async def main(page: ft.Page) -> None:
         page.window.on_event = handle_window_event(page, app, save_progress_overlay)
         decision = await app.check_license()
         await app.apply_license_decision(decision)
-        if decision.allowed and app.commercial_runtime.login_services:
+        if app.commercial_runtime.login_services:
             await asyncio.gather(*(service.restore() for service in app.commercial_runtime.login_services.values()))
 
         page.add(app.complete_page)
-        if decision.allowed and page.web:
+        if page.web:
             _services.start_background_loop()
-        elif decision.allowed:
+        else:
             logger.info("Starting periodic tasks in desktop mode")
             page.run_task(app.start_periodic_tasks)
 
@@ -195,9 +195,7 @@ async def main(page: ft.Page) -> None:
 
         page.run_task(app.start_license_watch)
 
-        if not decision.allowed:
-            await page.push_route("/activation")
-        elif page.route in ["/", ""]:
+        if page.route in ["/", ""]:
             last_route = app.settings.user_config.get("last_route", "/home")
             if last_route == "/activation":
                 last_route = "/home"

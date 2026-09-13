@@ -85,7 +85,7 @@ class App:
                 LicenseState.MISSING,
                 self.commercial_runtime.configuration_error or "授权服务不可用",
             )
-        self.recording_enabled = self.license_decision.allowed
+        self.services.membership_active = self.license_decision.allowed
         self._license_watch_started = False
         self.about = AboutPage(self)
         self.recordings = RecordingsPage(self)
@@ -205,8 +205,6 @@ class App:
         self._loading_page = True
 
         try:
-            if self.commercial_required and not self.license_decision.allowed and page_name != "activation":
-                page_name = "activation"
             await self.clear_content_area()
             if page := self.pages.get(page_name):
                 await self.settings.is_changed()
@@ -260,8 +258,6 @@ class App:
     async def start_periodic_tasks(self):
         decision = await self.check_license()
         await self.apply_license_decision(decision)
-        if not decision.allowed:
-            return
         rm = self.record_manager
         if rm is None:
             return
@@ -293,7 +289,9 @@ class App:
 
     async def apply_license_decision(self, decision: LicenseDecision, *, navigate: bool = False) -> None:
         self.license_decision = decision
-        self.recording_enabled = decision.allowed
+        self.services.membership_active = decision.allowed
+        if self.record_manager is not None:
+            self.record_manager.enforce_current_entitlements()
         if self.current_page is self.activation:
             await self.activation.show_decision(decision)
         if navigate and decision.allowed:
@@ -306,7 +304,7 @@ class App:
             elif self.record_manager is not None and not self.record_manager.is_periodic_task_running():
                 self.page.run_task(self.start_periodic_tasks)
         if navigate:
-            await self.page.push_route("/home" if decision.allowed else "/activation")
+            await self.page.push_route("/home" if decision.allowed else "/about")
 
     async def start_license_watch(self) -> None:
         if self._license_watch_started or not self.commercial_required:

@@ -266,6 +266,12 @@ class RecordingCardManager:
             self.app.record_manager.stop_recording(recording, manually_stopped=True)
             self.app.page.run_task(self.app.snack_bar.show_snack_bar, self._["stop_monitor_tip"])
         else:
+            if not self.app.record_manager.membership_active:
+                await self.app.snack_bar.show_snack_bar(
+                    "免费版不支持 24 小时自动监控，请手动开始单次录制",
+                    duration=4000,
+                )
+                return
             recording.update(
                 {
                     "monitor_status": not recording.monitor_status,
@@ -319,8 +325,8 @@ class RecordingCardManager:
                 self.app.record_manager.stop_recording(recording, manually_stopped=True)
                 await self.app.snack_bar.show_snack_bar(self._["stop_record_tip"])
             else:
-                if recording.monitor_status:
-                    await self.app.record_manager.check_if_live(recording)
+                if recording.monitor_status or not self.app.record_manager.membership_active:
+                    await self.app.record_manager.check_if_live(recording, automatic=False)
                     if recording.is_live:
                         self.app.record_manager.start_update(recording)
                         await self.app.snack_bar.show_snack_bar(self._["pre_record_tip"], bgcolor=ft.Colors.PRIMARY)

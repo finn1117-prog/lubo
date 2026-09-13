@@ -31,6 +31,10 @@ class RecordingDialog:
         default_record_format = config.get_value("record_format", "video_format", VideoFormat.TS).upper()
         default_record_type = "video" if default_record_format in VideoFormat.get_formats() else "audio"
         default_record_quality = config.get_value("quality", "record_quality", VideoQuality.OD)
+        membership_active = bool(getattr(self.app.services, "membership_active", False))
+        available_qualities = VideoQuality.get_qualities() if membership_active else [VideoQuality.SD, VideoQuality.LD]
+        if default_record_quality not in available_qualities:
+            default_record_quality = VideoQuality.SD
         default_video_bitrate = initial_values.get("video_bitrate")
         segment_record = config.get_value("segment_record", "segmented_recording_enabled", False)
         segment_time = config.get_value("segment_time", "video_segment_time", 1800)
@@ -100,11 +104,12 @@ class RecordingDialog:
 
         quality_dropdown = ft.Dropdown(
             label=self._["select_resolution"],
-            options=[ft.dropdown.DropdownOption(i, text=self._[i]) for i in VideoQuality.get_qualities()],
+            options=[ft.dropdown.DropdownOption(i, text=self._[i]) for i in available_qualities],
             border_radius=5,
             filled=False,
             value=default_record_quality,
             width=245,
+            helper_text=None if membership_active else "免费版最高支持标清",
         )
 
         video_bitrate_field = ft.TextField(
@@ -431,9 +436,11 @@ class RecordingDialog:
                         "speed": "等待录制",
                         "segment_record": segment_input.visible,
                         "segment_time": segment_input.value,
-                        "monitor_status": initial_values.get("monitor_status", True),
+                        "monitor_status": initial_values.get("monitor_status", True) if membership_active else False,
                         "display_title": display_title,
-                        "scheduled_recording": scheduled_setting_dropdown.value == "true",
+                        "scheduled_recording": (
+                            scheduled_setting_dropdown.value == "true" if membership_active else False
+                        ),
                         "scheduled_start_time": ",".join([str(i.value) for i in time_inputs]),
                         "monitor_hours": ",".join([str(i.value) for i in hour_inputs]),
                         "recording_dir": recording_dir_field.value,

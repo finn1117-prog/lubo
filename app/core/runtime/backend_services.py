@@ -41,6 +41,10 @@ class BackendServices:
         self.process_manager = AsyncProcessManager()
         self.subprocess_start_up_info = utils.get_startup_info()
         self.recording_enabled = True
+        # License entitlements are separate from the runtime recording switch.
+        # ``recording_enabled`` may be turned off for low disk space or shutdown;
+        # free users must still be able to make one basic recording.
+        self.membership_active = False
 
         # Filled in by ``bootstrap``.
         self.recording_manager: RecordingManager | None = None

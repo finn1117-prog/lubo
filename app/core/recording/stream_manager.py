@@ -345,8 +345,14 @@ class LiveStreamRecorder:
             # not manually stopped
             recording_duration = time.time() - self.recording_start_time
             if recording_duration > self.min_valid_recording_duration:
-                if self.services.recording_enabled and not self.is_flv_preferred_platform:
-                    self.services.run_coro(self.services.recording_manager.check_if_live(self.recording))
+                if (
+                    self.services.recording_enabled
+                    and self.services.recording_manager.allows_automatic_monitoring()
+                    and not self.is_flv_preferred_platform
+                ):
+                    self.services.run_coro(
+                        self.services.recording_manager.check_if_live(self.recording, automatic=True)
+                    )
             else:
                 self.recording.status_info = RecordingStatus.RECORDING_ERROR
 

@@ -4,7 +4,7 @@ import uuid
 import flet as ft
 
 from ...core.platforms.platform_handlers import get_platform_info
-from ...core.recording.record_manager import RecordingManager
+from ...core.recording.record_manager import FreeTierLimitError, RecordingManager
 from ...models.recording.recording_model import Recording
 from ...utils.logger import logger
 from ..base_page import PageBase
@@ -480,6 +480,17 @@ class RecordingsPage(PageBase):
         user_config = self.app.settings.user_config
         logger.info(f"Add items: {len(recordings_info)}")
 
+        if (
+            not self.app.record_manager.membership_active
+            and len(self.app.record_manager.recordings) + len(recordings_info)
+            > self.app.record_manager.FREE_MAX_RECORDINGS
+        ):
+            await self.app.snack_bar.show_snack_bar(
+                "免费版最多可添加 1 个直播间，请在“关于”中激活会员后添加更多直播间",
+                duration=4000,
+            )
+            return
+
         new_recordings = []
         for recording_info in recordings_info:
             if recording_info.get("record_format"):
@@ -528,7 +539,11 @@ class RecordingsPage(PageBase):
 
             recording.loop_time_seconds = int(user_config.get("loop_time_seconds", 300))
             recording.update_title(self._[recording.quality])
-            await self.app.record_manager.add_recording(recording)
+            try:
+                await self.app.record_manager.add_recording(recording)
+            except FreeTierLimitError as exc:
+                await self.app.snack_bar.show_snack_bar(str(exc), duration=4000)
+                return
             new_recordings.append(recording)
 
         if new_recordings:
