@@ -194,12 +194,15 @@ class PlatformLoginPage(PageBase):
             return
         loading = snapshot.state == LoginState.LOADING
         signed_in = snapshot.state == LoginState.SIGNED_IN
+        temporary = snapshot.state == LoginState.TEMPORARY
         invalid = snapshot.state == LoginState.INVALID
         controls["progress"].visible = loading
         controls["credential"].value = "已安全保存" if snapshot.has_credential else "未保存"
         controls["credential"].color = ft.Colors.GREEN_700 if snapshot.has_credential else ft.Colors.GREY_600
         if signed_in:
             controls["status"].value = "有效"
+        elif temporary:
+            controls["status"].value = "临时有效"
         elif loading:
             controls["status"].value = "验证中"
         elif invalid:
@@ -211,12 +214,14 @@ class PlatformLoginPage(PageBase):
         controls["status"].color = (
             ft.Colors.GREEN_700
             if signed_in
+            else ft.Colors.ORANGE_700
+            if temporary
             else ft.Colors.RED_600
             if snapshot.state in {LoginState.INVALID, LoginState.ERROR}
             else None
         )
         controls["verified"].value = self._format_time(snapshot.verified_at)
-        controls["login"].content = "重新登录" if snapshot.has_credential else "登录"
+        controls["login"].content = "登录真人账号" if temporary else "重新登录" if snapshot.has_credential else "登录"
         controls["logout"].visible = snapshot.has_credential
         self._refresh_action_availability()
 

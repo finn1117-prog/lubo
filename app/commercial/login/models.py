@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlsplit
 
 
@@ -23,6 +24,12 @@ class PlatformProfile:
             raise ValueError("Platform login URL must be an absolute HTTPS URL")
         if not self.key or not self.cookie_domains or not self.authentication_cookie_groups:
             raise ValueError("Platform profile is incomplete")
+
+
+@dataclass(frozen=True, slots=True)
+class BrowserLoginResult:
+    cookies: list[Any]
+    temporary: bool = False
 
 
 def _p(

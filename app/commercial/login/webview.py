@@ -17,7 +17,7 @@ from .cookies import (
     normalize_webview_cookies,
 )
 from .errors import LoginDisplayError
-from .models import PlatformProfile
+from .models import BrowserLoginResult, PlatformProfile
 
 
 class BrowserLoginError(LoginDisplayError):
@@ -57,6 +57,24 @@ _FIT_LOGIN_VIEWPORT_SCRIPT = """
   fitLoginViewport();
   window.setTimeout(fitLoginViewport, 600);
   window.setTimeout(fitLoginViewport, 1800);
+  return true;
+})()
+"""
+
+
+_GUEST_LOGIN_NOTICE_SCRIPT = """
+(() => {
+  if (document.getElementById('lubodaren-guest-login-notice')) return true;
+  const notice = document.createElement('div');
+  notice.id = 'lubodaren-guest-login-notice';
+  notice.textContent = '游客账号已登录，可以暂时使用。如需长期录屏，请继续登录真实账号。';
+  Object.assign(notice.style, {
+    position: 'fixed', top: '12px', left: '50%', transform: 'translateX(-50%)',
+    zIndex: '2147483647', padding: '10px 18px', borderRadius: '8px',
+    background: '#fff7e6', color: '#8a4b08', border: '1px solid #ffc766',
+    boxShadow: '0 4px 14px rgba(0,0,0,.18)', fontSize: '14px', fontWeight: '600'
+  });
+  document.body.appendChild(notice);
   return true;
 })()
 """
@@ -118,6 +136,8 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
         deadline = time.monotonic() + timeout_seconds
         login_open_attempted = False
         viewport_fitted_at = 0.0
+        guest_cookies: list[BrowserCookie] = []
+        guest_notice_shown = False
         while not closed.is_set() and time.monotonic() < deadline:
             now = time.monotonic()
             if now - viewport_fitted_at >= 3.0:
@@ -132,7 +152,11 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
                 if profile.authentication_probe_script:
                     authenticated = window.evaluate_js(profile.authentication_probe_script)
                     if authenticated is not True:
-                        raise CookieValidationError("页面尚未完成登录")
+                        guest_cookies = cookies
+                        if not guest_notice_shown:
+                            window.evaluate_js(_GUEST_LOGIN_NOTICE_SCRIPT)
+                            guest_notice_shown = True
+                        raise CookieValidationError("当前为游客状态")
             except CookieValidationError:
                 if profile.auto_open_login and not login_open_attempted:
                     try:
@@ -149,6 +173,12 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
             delivered.set()
             window.destroy()
             return
+        if guest_cookies:
+            result_queue.put(("temporary_cookies", [asdict(cookie) for cookie in guest_cookies]))
+            delivered.set()
+            if not closed.is_set():
+                window.destroy()
+            return
         if closed.is_set():
             return
         result_queue.put(("error", "登录等待超时，请重新打开登录页"))
@@ -164,7 +194,7 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
             private_mode=True,
             storage_path=storage_path,
         )
-        if not delivered.is_set():
+        if not delivered.wait(1.0):
             result_queue.put(("error", "登录窗口已关闭，未获取到登录状态"))
     except Exception:
         result_queue.put(("error", "无法启动 WebView2，请确认已安装 Microsoft Edge WebView2 Runtime"))
@@ -199,6 +229,9 @@ class PyWebView2Browser:
                 process.terminate()
                 process.join(5)
             result_queue.close()
-        if kind != "cookies":
+        if kind not in {"cookies", "temporary_cookies"}:
             raise BrowserLoginError(str(payload))
-        return [BrowserCookie(**item) for item in payload]
+        return BrowserLoginResult(
+            [BrowserCookie(**item) for item in payload],
+            temporary=kind == "temporary_cookies",
+        )

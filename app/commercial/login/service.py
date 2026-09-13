@@ -4,19 +4,20 @@ import asyncio
 import inspect
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 from .cookies import BrowserCookie, build_cookie_header
 from .errors import LoginDisplayError
-from .models import PlatformProfile
+from .models import BrowserLoginResult, PlatformProfile
 
 
 class LoginState(StrEnum):
     SIGNED_OUT = "signed_out"
     LOADING = "loading"
     SIGNED_IN = "signed_in"
+    TEMPORARY = "temporary"
     INVALID = "invalid"
     ERROR = "error"
 
@@ -31,7 +32,9 @@ class LoginSnapshot:
 
 @runtime_checkable
 class SecureCookieStore(Protocol):
-    def save_cookie(self, platform_key: str, cookie_header: str) -> object | Awaitable[object]: ...
+    def save_cookie(
+        self, platform_key: str, cookie_header: str, *, temporary: bool = False
+    ) -> object | Awaitable[object]: ...
 
     def load_cookie(self, platform_key: str) -> str | None | Awaitable[str | None]: ...
 
@@ -39,7 +42,7 @@ class SecureCookieStore(Protocol):
 
 
 class BrowserLogin(Protocol):
-    def capture(self, profile: PlatformProfile) -> list[BrowserCookie]: ...
+    def capture(self, profile: PlatformProfile) -> BrowserLoginResult | list[BrowserCookie]: ...
 
 
 RuntimeCookieCallback = Callable[[str, str | None], object | Awaitable[object]]
@@ -57,6 +60,7 @@ class EncryptedStoreCookieAdapter:
         self._store = store
         self._platform_key = platform_key
         self.verified_at: str | None = None
+        self.temporary = False
 
     def _check_key(self, platform_key: str) -> None:
         if platform_key != self._platform_key:
@@ -67,15 +71,18 @@ class EncryptedStoreCookieAdapter:
         path = getattr(self._store, "path", None)
         return bool(path and path.exists())
 
-    def save_cookie(self, platform_key: str, cookie_header: str) -> None:
+    def save_cookie(self, platform_key: str, cookie_header: str, *, temporary: bool = False) -> None:
         self._check_key(platform_key)
         self.verified_at = datetime.now(timezone.utc).isoformat()
+        self.temporary = temporary
         self._store.save(
             {
                 "version": 2,
                 "platform": platform_key,
                 "cookie_header": cookie_header,
                 "verified_at": self.verified_at,
+                "temporary": temporary,
+                "expires_at": ((datetime.now(timezone.utc) + timedelta(hours=2)).isoformat() if temporary else None),
             }
         )
 
@@ -89,6 +96,12 @@ class EncryptedStoreCookieAdapter:
         if platform_key == "xhs" and payload.get("version", 1) < 2:
             self._store.delete()
             return None
+        expires_at = payload.get("expires_at")
+        if payload.get("temporary") and isinstance(expires_at, str):
+            if datetime.fromisoformat(expires_at.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+                self._store.delete()
+                return None
+        self.temporary = bool(payload.get("temporary"))
         timestamp = payload.get("verified_at")
         self.verified_at = timestamp if isinstance(timestamp, str) else None
         value = payload.get("cookie_header")
@@ -98,6 +111,7 @@ class EncryptedStoreCookieAdapter:
         self._check_key(platform_key)
         self._store.delete()
         self.verified_at = None
+        self.temporary = False
 
 
 class CookieLoginService:
@@ -137,9 +151,10 @@ class CookieLoginService:
                 await self._publish(LoginState.SIGNED_OUT, "尚未登录")
                 return self.snapshot
             await _resolve(self._runtime_cookie_callback(self.profile.key, cookie_header))
+            temporary = bool(getattr(self._store, "temporary", False))
             await self._publish(
-                LoginState.SIGNED_IN,
-                "已从本机安全存储恢复登录",
+                LoginState.TEMPORARY if temporary else LoginState.SIGNED_IN,
+                "游客凭据临时有效，请登录真实账号以便长期录制" if temporary else "已从本机安全存储恢复登录",
                 getattr(self._store, "verified_at", None),
                 True,
             )
@@ -162,15 +177,20 @@ class CookieLoginService:
         )
         try:
             if inspect.iscoroutinefunction(self._browser.capture):
-                cookies = await self._browser.capture(self.profile)
+                captured = await self._browser.capture(self.profile)
             else:
-                cookies = await asyncio.to_thread(self._browser.capture, self.profile)
-            cookie_header = build_cookie_header(cookies, self.profile)
-            await _resolve(self._store.save_cookie(self.profile.key, cookie_header))
+                captured = await asyncio.to_thread(self._browser.capture, self.profile)
+            result = captured if isinstance(captured, BrowserLoginResult) else BrowserLoginResult(captured)
+            cookie_header = build_cookie_header(result.cookies, self.profile)
+            await _resolve(self._store.save_cookie(self.profile.key, cookie_header, temporary=result.temporary))
             await _resolve(self._runtime_cookie_callback(self.profile.key, cookie_header))
             await self._publish(
-                LoginState.SIGNED_IN,
-                "登录成功，凭据已加密保存在本机",
+                LoginState.TEMPORARY if result.temporary else LoginState.SIGNED_IN,
+                (
+                    "游客凭据临时有效 2 小时；如需长期稳定录制，请登录真实账号"
+                    if result.temporary
+                    else "登录成功，凭据已加密保存在本机"
+                ),
                 getattr(self._store, "verified_at", None),
                 True,
             )

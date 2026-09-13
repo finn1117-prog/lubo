@@ -1,7 +1,7 @@
 """Platform web-login boundary for the commercial desktop application."""
 
 from .cookies import BrowserCookie, CookieValidationError, build_cookie_header, normalize_webview_cookies
-from .models import KUAISHOU_PROFILE, PLATFORM_PROFILE_BY_KEY, PLATFORM_PROFILES, PlatformProfile
+from .models import KUAISHOU_PROFILE, PLATFORM_PROFILE_BY_KEY, PLATFORM_PROFILES, BrowserLoginResult, PlatformProfile
 from .service import (
     CookieLoginService,
     EncryptedStoreCookieAdapter,
@@ -17,6 +17,7 @@ __all__ = [
     "PLATFORM_PROFILE_BY_KEY",
     "BrowserCookie",
     "BrowserLoginError",
+    "BrowserLoginResult",
     "CookieLoginService",
     "CookieValidationError",
     "EncryptedStoreCookieAdapter",

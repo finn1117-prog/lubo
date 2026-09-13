@@ -1,7 +1,7 @@
 import asyncio
 import multiprocessing
 
-from app.commercial.login import KUAISHOU_PROFILE, CookieLoginService, LoginState
+from app.commercial.login import KUAISHOU_PROFILE, BrowserLoginResult, CookieLoginService, LoginState
 from app.commercial.login.cookies import BrowserCookie
 from app.commercial.login.service import EncryptedStoreCookieAdapter
 from app.commercial.login.webview import BrowserLoginError, _wait_for_process_result
@@ -45,7 +45,7 @@ class FakeCookieStore:
     def __init__(self):
         self.values = {}
 
-    def save_cookie(self, key, value):
+    def save_cookie(self, key, value, *, temporary=False):
         self.values[key] = value
 
     def load_cookie(self, key):
@@ -80,6 +80,24 @@ def test_login_encrypts_via_store_and_injects_runtime_memory():
     assert snapshot.state == LoginState.SIGNED_IN
     assert runtime["kuaishou"] == store.values["kuaishou"]
     assert "token" not in snapshot.message
+
+
+def test_guest_cookie_is_reported_as_temporary_instead_of_authenticated():
+    store = FakeCookieStore()
+
+    async def scenario():
+        service = CookieLoginService(
+            KUAISHOU_PROFILE,
+            FakeBrowser(BrowserLoginResult(authenticated_cookies(), temporary=True)),
+            store,
+            lambda _key, _value: None,
+        )
+        return await service.login()
+
+    snapshot = asyncio.run(scenario())
+
+    assert snapshot.state == LoginState.TEMPORARY
+    assert "2 小时" in snapshot.message
 
 
 def test_logout_deletes_store_and_runtime_cookie():
