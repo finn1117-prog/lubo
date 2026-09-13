@@ -43,6 +43,39 @@ _OPEN_LOGIN_SCRIPT = """
 """
 
 
+_FIT_LOGIN_VIEWPORT_SCRIPT = """
+(() => {
+  const fitLoginViewport = () => {
+    const body = document.body;
+    const root = document.documentElement;
+    if (!body || !root) return false;
+    body.style.transformOrigin = 'top left';
+    body.style.zoom = '0.85';
+    root.style.overflowX = 'hidden';
+    return true;
+  };
+  fitLoginViewport();
+  window.setTimeout(fitLoginViewport, 600);
+  window.setTimeout(fitLoginViewport, 1800);
+  return true;
+})()
+"""
+
+
+def _recommended_window_size() -> tuple[int, int]:
+    """Use most of the working screen without forcing a maximized login window."""
+    screen_width, screen_height = 1360, 900
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            screen_width = ctypes.windll.user32.GetSystemMetrics(0)
+            screen_height = ctypes.windll.user32.GetSystemMetrics(1)
+        except (AttributeError, OSError):
+            pass
+    return max(960, min(1280, screen_width - 80)), max(640, min(820, screen_height - 100))
+
+
 def _wait_for_process_result(process, result_queue, timeout_seconds: float):
     """Drain IPC while the child is alive so a large Cookie payload cannot deadlock on exit."""
     deadline = time.monotonic() + timeout_seconds
@@ -64,12 +97,13 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
         result_queue.put(("error", "未安装网页登录组件 pywebview"))
         return
 
+    window_width, window_height = _recommended_window_size()
     window = webview.create_window(
         f"登录{profile.display_name}（官方页面）",
         profile.login_url,
-        width=1100,
-        height=760,
-        min_size=(760, 540),
+        width=window_width,
+        height=window_height,
+        min_size=(min(900, window_width), min(620, window_height)),
         confirm_close=True,
     )
     closed = threading.Event()
@@ -83,7 +117,15 @@ def _webview_process(profile: PlatformProfile, result_queue, storage_path: str, 
     def capture_when_authenticated() -> None:
         deadline = time.monotonic() + timeout_seconds
         login_open_attempted = False
+        viewport_fitted_at = 0.0
         while not closed.is_set() and time.monotonic() < deadline:
+            now = time.monotonic()
+            if now - viewport_fitted_at >= 3.0:
+                try:
+                    window.evaluate_js(_FIT_LOGIN_VIEWPORT_SCRIPT)
+                    viewport_fitted_at = now
+                except Exception:
+                    pass
             try:
                 cookies = filter_platform_cookies(normalize_webview_cookies(window.get_cookies()), profile)
                 build_cookie_header(cookies, profile)
