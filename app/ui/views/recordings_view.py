@@ -521,7 +521,10 @@ class RecordingsPage(PageBase):
                     record_format=user_config.get("video_format", "TS"),
                     segment_record=user_config.get("segmented_recording_enabled", False),
                     segment_time=user_config.get("video_segment_time", "1800"),
-                    monitor_status=True,
+                    # Free users get a single immediate check/recording. Keeping
+                    # monitoring off prevents the task from becoming a 24-hour
+                    # watcher after that recording ends.
+                    monitor_status=self.app.record_manager.membership_active,
                     scheduled_recording=user_config.get("scheduled_recording", False),
                     scheduled_start_time=user_config.get("scheduled_start_time"),
                     monitor_hours=user_config.get("monitor_hours"),
@@ -531,6 +534,9 @@ class RecordingsPage(PageBase):
                     flv_use_direct_download=user_config.get("flv_use_direct_download"),
                     video_bitrate=None,
                 )
+
+            if not self.app.record_manager.membership_active:
+                recording.monitor_status = False
 
             platform, platform_key = get_platform_info(recording.url)
             if platform and platform_key:
@@ -561,6 +567,12 @@ class RecordingsPage(PageBase):
                 self.recording_card_area.content.controls.append(card)
                 self.app.record_card_manager.cards_obj[recording.rec_id]["card"] = card
                 self.app.page.pubsub.send_others_on_topic("add", recording)
+                if not self.app.record_manager.membership_active:
+                    self.app.page.run_task(
+                        self.app.record_manager.check_if_live,
+                        recording,
+                        automatic=False,
+                    )
 
             self.recording_card_area.update()
 

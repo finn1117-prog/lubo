@@ -88,7 +88,7 @@ def test_free_tier_cannot_enable_continuous_monitoring():
         asyncio.run(manager.start_monitor_recording(recording))
 
 
-def test_free_tier_skips_automatic_check_but_allows_manual_check_path():
+def test_free_tier_skips_automatic_check_but_manual_check_is_not_blocked_by_monitor_switch(monkeypatch):
     manager = make_manager()
     recording = make_recording(monitor_status=False)
     GlobalRecordingState.recordings = [recording]
@@ -96,8 +96,35 @@ def test_free_tier_skips_automatic_check_but_allows_manual_check_path():
     asyncio.run(manager.check_if_live(recording, automatic=True))
     assert recording.status_info is None
 
+    reached_stream_lookup = False
+
+    async def stop_before_network_lookup(_output_dir=None):
+        nonlocal reached_stream_lookup
+        reached_stream_lookup = True
+        manager.services.recording_enabled = False
+
+    manager.settings = SimpleNamespace(
+        user_config={"language": "zh_CN"},
+        get_video_save_path=lambda: ".",
+    )
+    manager.services.recording_enabled = True
+    manager.check_free_space = stop_before_network_lookup
     asyncio.run(manager.check_if_live(recording, automatic=False))
-    assert recording.status_info == RecordingStatus.STOPPED_MONITORING
+
+    assert reached_stream_lookup is True
+    assert recording.status_info == RecordingStatus.NOT_RECORDING_SPACE
+
+
+def test_free_tier_does_not_stop_valid_sd_run_when_saved_preference_is_original():
+    manager = make_manager()
+    recording = make_recording(quality=VideoQuality.OD, monitor_status=False)
+    recording.is_recording = True
+    GlobalRecordingState.recordings = [recording]
+    manager.stop_recording = AsyncMock()
+
+    manager.enforce_current_entitlements()
+
+    manager.stop_recording.assert_not_called()
 
 
 def test_free_tier_cannot_run_legacy_extra_room():

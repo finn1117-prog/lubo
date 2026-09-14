@@ -116,8 +116,10 @@ class RecordingManager:
 
         for index, recording in enumerate(self.recordings):
             exceeds_room_limit = index >= self.FREE_MAX_RECORDINGS
-            exceeds_quality_limit = recording.quality in self.FREE_RESTRICTED_QUALITIES
-            if recording.is_recording and (exceeds_room_limit or exceeds_quality_limit):
+            # Paid quality preferences remain saved, while free runs are already
+            # clamped by effective_recording_quality(). Do not stop that valid
+            # SD run merely because the saved preference was HD or original.
+            if recording.is_recording and exceeds_room_limit:
                 self.stop_recording(recording, manually_stopped=True)
 
     async def add_recording(self, recording):
@@ -339,7 +341,10 @@ class RecordingManager:
             logger.debug(f"Skip check_if_live because recorder is active: {recording.url}")
             return
 
-        if not recording.monitor_status:
+        # A free user may run a one-off manual check/recording while continuous
+        # monitoring stays disabled. Paid/manual calls keep the legacy rule that
+        # a stopped monitor must be started before checking.
+        if not recording.monitor_status and (automatic or self.membership_active):
             recording.display_title = f"[{self._['monitor_stopped']}] {recording.title}"
             recording.status_info = RecordingStatus.STOPPED_MONITORING
             recording.is_checking = False
