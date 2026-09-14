@@ -1,21 +1,15 @@
-import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import { timingSafeEqual } from 'node:crypto';
-import type { Request } from 'express';
-import type { AppConfig } from './config';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { AdminAuthService, type AdminRequest } from './admin-auth.service';
 
 @Injectable()
 export class AdminAuthGuard implements CanActivate {
-  constructor(@Inject('APP_CONFIG') private readonly config: AppConfig) {}
+  constructor(private readonly auth: AdminAuthService) {}
 
-  canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<Request>();
-    const authorization = req.get('authorization') ?? '';
-    const supplied = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
-    const actual = Buffer.from(supplied);
-    const expected = Buffer.from(this.config.adminToken);
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
-      throw new UnauthorizedException('Valid admin bearer token required');
-    }
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<AdminRequest>();
+    const token = this.auth.bearerFrom(req);
+    if (!token) throw new UnauthorizedException('请先登录管理后台');
+    req.adminAccount = await this.auth.authenticate(token);
     return true;
   }
 }

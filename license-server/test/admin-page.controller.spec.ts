@@ -10,11 +10,16 @@ describe('admin page', () => {
     expect(html).toContain('许可证管理');
     expect(html).toContain('设备管理');
     expect(html).toContain('操作记录');
+    expect(html).toContain('账号管理');
     expect(html).toContain('版本发布');
   });
 
-  it('keeps the bearer token in page memory instead of browser storage', () => {
+  it('uses account and password login while keeping the session in page memory', () => {
+    expect(html).toContain('id="username"');
+    expect(html).toContain('id="password"');
+    expect(html).toContain("fetch('/admin/auth/login'");
     expect(html).toContain("const state={token:''");
     expect(html).not.toMatch(/localStorage|sessionStorage/);
+    expect(html).not.toContain('请输入 ADMIN_TOKEN');
   });
 });

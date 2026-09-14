@@ -1,7 +1,9 @@
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 
 export interface AppConfig {
-  adminToken: string;
+  adminBootstrapUsername: string;
+  adminBootstrapPassword: string;
+  adminSessionHours: number;
   hashPepper: string;
   privateKeyPem: string;
   publicKeyPem: string;
@@ -16,10 +18,20 @@ function required(name: string): string {
 }
 
 export function loadConfig(): AppConfig {
-  const adminToken = required('ADMIN_TOKEN');
+  const adminBootstrapUsername = (process.env.ADMIN_BOOTSTRAP_USERNAME ?? 'admin').trim();
+  const adminBootstrapPassword = required('ADMIN_BOOTSTRAP_PASSWORD');
+  const adminSessionHours = Number.parseInt(process.env.ADMIN_SESSION_HOURS ?? '12', 10);
   const hashPepper = required('LICENSE_HASH_PEPPER');
   const privateKeyPem = required('LICENSE_ED25519_PRIVATE_KEY');
-  if (adminToken.length < 32) throw new Error('ADMIN_TOKEN must be at least 32 characters');
+  if (!/^[A-Za-z0-9_.-]{3,32}$/.test(adminBootstrapUsername)) {
+    throw new Error('ADMIN_BOOTSTRAP_USERNAME must be 3-32 letters, numbers, dots, dashes or underscores');
+  }
+  if (adminBootstrapPassword.length < 12) {
+    throw new Error('ADMIN_BOOTSTRAP_PASSWORD must be at least 12 characters');
+  }
+  if (!Number.isInteger(adminSessionHours) || adminSessionHours < 1 || adminSessionHours > 72) {
+    throw new Error('ADMIN_SESSION_HOURS must be between 1 and 72');
+  }
   if (hashPepper.length < 32) throw new Error('LICENSE_HASH_PEPPER must be at least 32 characters');
 
   const privateKey = createPrivateKey(privateKeyPem);
@@ -32,5 +44,14 @@ export function loadConfig(): AppConfig {
     throw new Error('OFFLINE_GRACE_DAYS must be between 0 and 30');
   }
   const port = Number.parseInt(process.env.PORT ?? '3000', 10);
-  return { adminToken, hashPepper, privateKeyPem, publicKeyPem, offlineGraceDays, port };
+  return {
+    adminBootstrapUsername,
+    adminBootstrapPassword,
+    adminSessionHours,
+    hashPepper,
+    privateKeyPem,
+    publicKeyPem,
+    offlineGraceDays,
+    port,
+  };
 }

@@ -9,8 +9,8 @@
 - 支持月卡（30 天）、季卡（90 天）、年卡（365 天）和终身会员；有效期从激活码首次激活时开始计算。
 - 默认每码一台设备；后台可设置会员档位、设备上限、禁用和人工解绑。
 - 客户端许可证由 Ed25519 签名，并有有限的离线有效期；联网校验成功会刷新票据。
-- 管理 API 使用恒定时间比较的 Bearer token。生产环境应由 Caddy、Nginx 或云负载均衡器终止 HTTPS，且不要直接暴露容器端口。
-- 私钥、数据库密码、pepper 和管理令牌只从环境变量读取，仓库不提供可用默认值。
+- 管理后台使用账号密码登录，密码以带随机盐的 scrypt 摘要保存；登录会话只保存在服务端内存中，到期或重启后需要重新登录。
+- 私钥、数据库密码、pepper 和初始管理员密码只从环境变量读取，仓库不提供可用默认值。
 
 ## 本地启动
 
@@ -24,13 +24,14 @@
    ```
 
 3. 启动：`docker compose up --build -d`。
-4. 通过 HTTPS 反向代理访问 `/admin`。页面会要求输入 `ADMIN_TOKEN`，令牌只保存在当前页面内存中。
+4. 设置 `ADMIN_BOOTSTRAP_USERNAME` 和 `ADMIN_BOOTSTRAP_PASSWORD`，首次启动会在账号表为空时创建初始管理员。
+5. 通过 HTTPS 反向代理访问 `/admin`，使用管理账号和密码登录。
 
 直接开发时可运行 `npm install`、`npx prisma generate`、`npm run start:dev`。数据库迁移使用 `npx prisma migrate deploy`。
 
 ## API
 
-所有 JSON 请求都会拒绝未声明字段。管理接口需要 `Authorization: Bearer <ADMIN_TOKEN>`。
+所有 JSON 请求都会拒绝未声明字段。登录成功后，页面使用短期 Bearer 会话访问管理接口。
 
 - `POST /v1/license/activate`：`{ activationCode, installationId, deviceFingerprint }`
 - `POST /v1/license/validate`：`{ license: { algorithm, payload, signature }, installationId, deviceFingerprint }`
@@ -42,6 +43,12 @@
 - `POST /admin/licenses/:id/disable`
 - `POST /admin/licenses/:id/unbind`
 - `PUT /admin/versions/:channel`：`{ version, downloadUrl?, releaseNotes?, mandatory? }`
+- `POST /admin/auth/login`：`{ username, password }`
+- `POST /admin/auth/logout`
+- `GET /admin/accounts`
+- `POST /admin/accounts`：`{ username, password }`
+- `PUT /admin/accounts/:id/password`：`{ password }`
+- `DELETE /admin/accounts/:id`
 
 客户端应内置并信任服务端 Ed25519 公钥。首次激活响应也包含公钥，便于部署验收，但客户端不能把响应中的任意公钥当作信任根。
 

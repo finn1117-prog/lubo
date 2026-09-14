@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { MembershipPlan } from '@prisma/client';
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, Length, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import type { SignedLicense } from './crypto';
 
 export class DeviceDto {
@@ -34,4 +34,18 @@ export class SetVersionDto {
   @IsOptional() @IsUrl({ require_protocol: true }) downloadUrl?: string;
   @IsOptional() @IsString() @MaxLength(5000) releaseNotes?: string;
   @IsOptional() @IsBoolean() mandatory?: boolean;
+}
+
+export class AdminLoginDto {
+  @IsString() @Matches(/^[A-Za-z0-9_.-]{3,32}$/) username!: string;
+  @IsString() @Length(8, 128) password!: string;
+}
+
+export class CreateAdminAccountDto {
+  @IsString() @Matches(/^[A-Za-z0-9_.-]{3,32}$/) username!: string;
+  @IsString() @Length(10, 128) password!: string;
+}
+
+export class ChangeAdminPasswordDto {
+  @IsString() @Length(10, 128) password!: string;
 }
