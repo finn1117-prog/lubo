@@ -40,9 +40,18 @@
       "stop_monitoring": "Stop Monitoring",
       "recent_added_recordings": "Recent Added",
       "no_recordings": "No Recordings",
-      "greeting_morning": "Good Morning",
-      "greeting_afternoon": "Good Afternoon",
-      "greeting_evening": "Good Evening"
+    "greeting_morning": "Good Morning",
+    "greeting_afternoon": "Good Afternoon",
+    "greeting_evening": "Good Evening",
+    "quick_start": "Quick Start",
+    "quick_start_hint": "Follow these steps for more reliable live-room detection and recording.",
+    "quick_start_step_login": "Sign in to the platform",
+    "quick_start_login_desc": "First sign in from Platform Login.",
+    "quick_start_step_add": "Add a live-room link",
+    "quick_start_add_desc": "Paste the broadcaster's live-room URL in Recordings.",
+    "quick_start_step_record": "Start recording",
+    "quick_start_record_desc": "Recording begins when the stream is detected live.",
+    "quick_start_free_hint": "Free users can record one room in SD and do not have 24-hour automatic monitoring."
   },
   "recordings_page": {
     "recording_list": "Recording List",

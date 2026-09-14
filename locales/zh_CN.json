@@ -40,9 +40,18 @@
       "stop_monitoring": "停止监控",
       "recent_added_recordings": "最近添加",
       "no_recordings": "暂无录制记录",
-      "greeting_morning": "早上好",
-      "greeting_afternoon": "下午好",
-      "greeting_evening": "晚上好"
+    "greeting_morning": "早上好",
+    "greeting_afternoon": "下午好",
+    "greeting_evening": "晚上好",
+    "quick_start": "使用说明",
+    "quick_start_hint": "建议按以下顺序操作，登录后可提高直播地址解析和录制的稳定性。",
+    "quick_start_step_login": "登录对应平台",
+    "quick_start_login_desc": "先到“平台登录”完成账号登录。",
+    "quick_start_step_add": "添加直播间链接",
+    "quick_start_add_desc": "在“录制”中粘贴主播直播间地址。",
+    "quick_start_step_record": "开始录制",
+    "quick_start_record_desc": "检测到开播后即可开始录制。",
+    "quick_start_free_hint": "免费版可录制 1 个直播间，使用标清画质，不支持 24 小时自动监控。"
   },
   "recordings_page": {
     "recording_list": "录制列表",

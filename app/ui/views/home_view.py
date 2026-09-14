@@ -28,6 +28,7 @@ class HomePage(PageBase):
         home_content = ft.Column(
             controls=[
                 self.create_home_header(),
+                self.create_quick_start_area(),
                 self.create_stats_area(),
                 self.create_announcements_area(),
                 self.create_features_area(),
@@ -35,6 +36,82 @@ class HomePage(PageBase):
             spacing=20,
             scroll=ft.ScrollMode.AUTO,
             expand=True,
+        )
+
+    def create_quick_start_area(self):
+        """Show the essential first-run flow before users add a live room."""
+
+        steps = [
+            (
+                "1",
+                ft.Icons.ACCOUNT_CIRCLE_OUTLINED,
+                self._["quick_start_step_login"],
+                self._["quick_start_login_desc"],
+            ),
+            ("2", ft.Icons.ADD_LINK_ROUNDED, self._["quick_start_step_add"], self._["quick_start_add_desc"]),
+            (
+                "3",
+                ft.Icons.FIBER_MANUAL_RECORD_ROUNDED,
+                self._["quick_start_step_record"],
+                self._["quick_start_record_desc"],
+            ),
+        ]
+
+        def create_step(number, icon, title, description):
+            return ft.Container(
+                expand=True,
+                padding=ft.Padding.all(14),
+                border_radius=10,
+                bgcolor=ft.Colors.with_opacity(0.06, ft.Colors.PRIMARY),
+                content=ft.Row(
+                    [
+                        ft.Container(
+                            width=30,
+                            height=30,
+                            border_radius=15,
+                            alignment=ft.alignment.Alignment.CENTER,
+                            bgcolor=ft.Colors.PRIMARY,
+                            content=ft.Text(number, color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD),
+                        ),
+                        ft.Icon(icon, color=ft.Colors.PRIMARY, size=22),
+                        ft.Column(
+                            [
+                                ft.Text(title, weight=ft.FontWeight.BOLD, size=15),
+                                ft.Text(description, size=12, color=ft.Colors.GREY_600),
+                            ],
+                            spacing=2,
+                            expand=True,
+                        ),
+                    ],
+                    spacing=9,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+            )
+
+        step_controls = [create_step(*step) for step in steps]
+        is_mobile = self.app.is_mobile or self.page.width < 720
+        flow = ft.Column(step_controls, spacing=10) if is_mobile else ft.Row(step_controls, spacing=10)
+
+        return ft.Container(
+            margin=ft.Margin.only(left=20, right=20),
+            padding=ft.Padding.all(16),
+            border_radius=12,
+            bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
+            content=ft.Column(
+                [
+                    ft.Row(
+                        [
+                            ft.Icon(ft.Icons.TIPS_AND_UPDATES_OUTLINED, color=ft.Colors.PRIMARY),
+                            ft.Text(self._["quick_start"], size=20, weight=ft.FontWeight.BOLD),
+                        ],
+                        spacing=8,
+                    ),
+                    ft.Text(self._["quick_start_hint"], size=13, color=ft.Colors.GREY_600),
+                    flow,
+                    ft.Text(self._["quick_start_free_hint"], size=12, color=ft.Colors.GREY_600),
+                ],
+                spacing=12,
+            ),
         )
 
         self.content_area.controls.append(home_content)
